@@ -1,0 +1,11 @@
+node_module
+npm-debug.log
+screenshots
+./LOG/access.log
+.git
+.gitignore
+.dockerignore
+README.md
+README.pdf
+RELEASE_NOTES.md
+START_SPX.bat
