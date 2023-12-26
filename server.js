@@ -2,13 +2,13 @@
 // ===============================================================
 //
 // "SPX Graphics Controller"
-// (c) 2020-2022 Softpix (https://spx.graphics)
+// (c) 2020-2023 Softpix (https://spx.graphics)
 // 
 // An open source PROFESSIONAL LIVE GRAPHICS solution for
 // PC, Mac, Linux or the cloud. 
 //
 // Website .......... https://spx.graphics
-// Join Discord ..... https://bit.do/joinspx
+// Join Discord ..... https://bit.ly/joinspx
 // Knowledge Base ... https://spxgc.tawk.help
 // Sourcecode ....... https://github.com/TuomoKu
 // 
@@ -379,7 +379,7 @@ app.engine('handlebars', exphbs({
       showProfileData = spx.GetJsonData(profileFile);
       if(!showProfileData.templates) {
         // if no templates assigned to this project
-        html += '<span style="display: inline-block; margin: 10px;padding: 0.6em 1.7em; background: #0000001c; color:#ffffff; font-size:0.7em; border-radius:2em; text-align:center;">' + spx.lang('warning.notemplates') + '</span>';
+        html += '<span style="display: inline-block; width: 100%; margin: 10px;padding: 0.6em 1.7em; background: #0000001c; color:#ffffff; font-size:0.7em; border-radius:2em; text-align:center;">' + spx.lang('warning.notemplates') + '</span><br><br>';
         return html
       } 
       showProfileData.templates.forEach((template,i) => {
@@ -827,7 +827,7 @@ process.on('uncaughtException', function(err) {
 
 var server = app.listen(port, (err) => {
 
-  let splash = '  Copyright 2020-2022 Softpix\n\n' +
+  let splash = '  Copyright 2020-2023 Softpix\n\n' +
   `  SPX version ............ ${global.vers}\n` +  
   '  License ................ See LICENSE.txt\n' +
   '  Homepage ............... https://spx.graphics\n' +
@@ -840,6 +840,11 @@ var server = app.listen(port, (err) => {
   `  Cfg / dataroot ......... ${path.resolve(config.general.dataroot)}\n`  +  
   `  Cfg / logfolder ........ ${logDirectory}\n`; 
   /* `  Cfg / lauchchrome ...... ${config.general.launchchrome}\n` */
+
+
+  if (config.general.apikey && config.general.apikey != '') {
+    splash += `  Cfg / apikey ........... Set in config.json\n`;
+  }
   
   // Where are CasparCG templates loaded from (file:// or http://):
   let TemplatesFromInfo;
@@ -908,10 +913,12 @@ var server = app.listen(port, (err) => {
 // io must be declared as 'global', so routes can access it.
 global.io = require('socket.io')(server);
 var clients = {}
+// var spxControllers = {} // TODO: implement detection of several controllers!
 io.sockets.on('connection', function (socket) {
 
   logger.verbose('*** Socket connection (' + socket.id + ") Connections: " + io.engine.clientsCount);
   clients[socket.id] = socket;
+  notifyMultipleControllers(); // on Connection
 
   socket.on('disconnect', async function () {
     let SPXClientName = clients[socket.id].SPXClientName || '** no name **';
@@ -925,6 +932,7 @@ io.sockets.on('connection', function (socket) {
     data.source = 'windowClose'
     data.clientName = SPXClientName
     io.emit('SPXMessage2Client', data);
+    notifyMultipleControllers(); // on Disconnect
   }); // end disconnect
 
 
@@ -957,3 +965,27 @@ io.sockets.on('connection', function (socket) {
 }); // end socket-io
 
 
+function notifyMultipleControllers() {
+  // Added in 1.2.0
+  // Count how many controllers are connected to Server.
+  // This can be ignored with a config flag.
+  if ( config.general?.disableSeveralControllersWarning==true ) {
+    logger.verbose('notifyMultipleControllers feature is disabled with a config flag.');
+    return;
+  }
+
+
+  setTimeout(function(){ 
+    let count = 0;
+    for (const [key, value] of Object.entries(clients)) {
+      if (value.SPXClientName == 'SPX_CONTROLLER') {
+        count++;
+      }
+    }
+    logger.verbose('notifyMultipleControllers: ' + count + ' controllers connected.');
+    let data = {};
+    data.spxcmd = 'notifyMultipleControllers'
+    data.count = count
+    io.emit('SPXMessage2Client', data);    
+  }, 100); // small delay
+}

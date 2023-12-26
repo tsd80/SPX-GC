@@ -15,7 +15,7 @@ function PluginInstance() {
             items: [
                 {
                     "text": "SPX Discord",
-                    "value":"https://bit.do/joinspx"
+                    "value":"https://bit.ly/joinspx"
                 },
                 {
                     "text": "SPX Store",

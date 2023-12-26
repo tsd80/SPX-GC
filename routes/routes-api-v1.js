@@ -23,6 +23,9 @@ const xlsx = require('node-xlsx').default;
 const axios = require('axios')
 const PlayoutCCG = require('../utils/playout_casparCG.js');
 const { query } = require("../utils/logger");
+const spxAuth = require('../utils/spx_auth.js');
+let apiCache = [] // used to cache [undocumented] API calls
+
 
 // ROUTES -------------------------------------------------------------------------------------------
 router.get('/', function (req, res) {
@@ -38,7 +41,7 @@ router.get('/', function (req, res) {
               "vers"    :     "v1.0.12",
               "method"  :     "GET",
               "param"   :     "invokeTemplateFunction?playserver=OVERLAY&playchannel=1&playlayer=19&webplayout=19&function=myCustomTemplateFunction&params=Hello%20World",
-              "info"    :     "Uses an invoke handler to call a function in a template. See required parameters in the example call above."
+              "info"    :     "Uses an invoke handler to call a function in a template. See required parameters in the example call above. JSON objects can be passed as params by urlEncoding stringified JSON. Search SPX Knowledge Base for more info with keyword 'invoke'."
             },
             {
               "vers"    :     "v1.0.12",
@@ -106,6 +109,12 @@ router.get('/', function (req, res) {
               "method"  :     "GET",
               "param"   :     "gettemplates?project=HelloWorld-project",
               "info"    :     "Returns templates and their settings from a given project."
+            },
+            {
+              "vers"    :     "v1.1.4",
+              "method"  :     "GET",
+              "param"   :     "executeScript?file=open-calculator.bat",
+              "info"    :     "Execute a shell script/batch file in ASSETS/scripts folder using a shell associated with a given file extension."
             },
             ]
         },
@@ -214,30 +223,50 @@ router.get('/', function (req, res) {
 
 
 // DIRECT COMMANDS (bypassing rundown) ----------------------------------------------------------
-  router.get('/invokeTemplateFunction/', async (req, res) => {
+  router.get('/invokeTemplateFunction/', spxAuth.CheckAPIKey, async (req, res) => {
 
-    // function fixedEncodeURIComponent (str) {
-    //   return encodeURIComponent(str).replace(/[!'()*]/g, escape); // encode single quote also!
-    // }
+    // Init params
+    let params = req.query.params || ''; // improved in 1.1.4 to avoid undefined
 
-    // create a data object 
+    // create the data object 
     let dataOut = {};
+    dataOut.message      = 'Sent request to SPX server.'
     dataOut.prepopulated = 'true'
     dataOut.playserver   = req.query.playserver || 'OVERLAY';
     dataOut.playchannel  = req.query.playchannel || '1';
     dataOut.playlayer    = req.query.playlayer || '1';
     dataOut.webplayout   = req.query.webplayout || '1';
-    // dataOut.relpath      = 'we_need_some_filename_here_to_prevent_errors.html'
     dataOut.command      = 'invoke';
-    dataOut.invoke       = req.query.function + '(\"' + encodeURIComponent(req.query.params) + '\")'; // encode added in v1.1.0
-    res.status(200).send('Sent request to SPX server: ' + JSON.stringify(dataOut));
-    // console.log('API endpoint for invoke got:', dataOut);
+    dataOut.function     = req.query.function || ''; // refactored in v.1.2.0 to use separate function and params
+    dataOut.params       = encodeURIComponent(req.query.params) || '';
+    if (params=='') {
+      dataOut.invoke       = req.query.function + '()'; // improved in 1.2.0 to avoid undefined
+    } else {
+      dataOut.invoke       = req.query.function + '(\"' + encodeURIComponent(params) + '\")'; // encode added in v1.1.0
+    }
+    logger.verbose('invokeTemplateFunction: [' + dataOut.function + '] with params: [' + dataOut.params + '].');
+    res.status(200).json(dataOut);
     spx.httpPost(dataOut,'/gc/playout')
   });
 
 
-  router.post('/directplayout', async (req, res) => {
+  router.post('/directplayout', spxAuth.CheckAPIKey, async (req, res) => {
+
+    // Example, TODO: Add to docs:
+    // let directplayoutData  = {
+    //   casparServer = "OVERLAY" /* named CCG server */,
+    //   casparChannel = '1' /* CCG channel number as string */,
+    //   casparLayer = '1' /* CCG layer number as string */,
+    //   webplayoutLayer = '1' /* webplayout layer number as string */,
+    //   relativeTemplatePath = '/vendor/pack/template.html', /* within ASSETS folder */
+    //   command = 'play' /* next, stop */,
+    //   dataformat = 'json' /* json, xml */,
+    //   DataFields = '{field: f0, value: "Lorem ipsum"}',
+    // }
+
+
     let dataOut = {};
+    dataOut.message      = 'Sent request to SPX server.'
     dataOut.playserver   = req.body.casparServer || 'OVERLAY';
     dataOut.playchannel  = req.body.casparChannel || '1';
     dataOut.playlayer    = req.body.casparLayer || '1';
@@ -247,71 +276,77 @@ router.get('/', function (req, res) {
     dataOut.command      = req.body.command || 'play';
     dataOut.dataformat   = req.body.dataformat || 'xml';
     dataOut.fields       = req.body.DataFields || '{field: f0, value: "Lorem ipsum"}';
-    res.status(200).send('Sent request to SPX server: ' + JSON.stringify(dataOut));
+    res.status(200).json(dataOut);
     spx.httpPost(dataOut,'/gc/playout')
   });
 
-  router.get('/directplayout', async (req, res) => {
+  router.get('/directplayout', spxAuth.CheckAPIKey, async (req, res) => {
     res.status(404).send('Sorry, this endpoint only available as POST REQUEST with parameters, see the example text or see controlRundownItemByID -endpoint for basic play/stop controls.');
   });
 
 
 // RUNDOWN COMMANDS -----------------------------------------------------------------------------
-    router.get('/rundown/load/', async (req, res) => {
+    router.get('/rundown/load/', spxAuth.CheckAPIKey, async (req, res) => {
       let file = req.query.file;
       let dataOut = {};
+      dataOut.message      = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownLoad';
       dataOut.file    = file;
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end load
 
-    router.get('/rundown/focusFirst/', async (req, res) => {
+    router.get('/rundown/focusFirst/', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownFocusFirst';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end focusFirst
 
-    router.get('/rundown/focusNext/', async (req, res) => {
+    router.get('/rundown/focusNext/', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownFocusNext';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end focusNext
 
-    router.get('/rundown/focusPrevious/', async (req, res) => {
+    router.get('/rundown/focusPrevious/', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownFocusPrevious';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end focusPrevious
 
-    router.get('/rundown/focusLast/', async (req, res) => {
+    router.get('/rundown/focusLast/', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownFocusLast';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end focusLast
 
-    router.get('/rundown/focusByID/:id', async (req, res) => {
+    router.get('/rundown/focusByID/:id', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
       dataOut.APIcmd  = 'RundownFocusByID';
       dataOut.itemID  = req.params.id;
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+    }); // end focusByID
 
-    router.get('/rundown/stopAllLayers', async (req, res) => {
+    router.get('/rundown/stopAllLayers', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'RundownStopAll';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
-    });
+      res.status(200).json(dataOut);
+    }); // end stopAllLayers
 
 // HELPER COMMANDS ----------------------------------------------------------------------------------
 
-    router.get('/version', async (req, res) => {
+    router.get('/version', spxAuth.CheckAPIKey, async (req, res) => {
       let data = {};
       data.vendor = "Softpix";
       data.product = "SPX";
@@ -325,9 +360,9 @@ router.get('/', function (req, res) {
         data.env.version = global.env.version;
       }
       return res.status(200).json(data)
-    });
+    }); // end version
 
-    router.get('/panic', async (req, res) => {
+    router.get('/panic', spxAuth.CheckAPIKey, async (req, res) => {
       // This WILL NOT change playlist items onair to "false"!
 
       // Clear Webplayout ---------------------------
@@ -335,12 +370,64 @@ router.get('/', function (req, res) {
       io.emit('SPXMessage2Controller', {APIcmd:'RundownAllStatesToStopped'}); // stop UI and save stopped values to rundown
 
       // Clear CasparCG -----------------------------
-      if (!spx.CCGServersConfigured){ return } // exit early, no need to do any CasparCG work
-      PlayoutCCG.clearChannelsFromGCServer(req.body.server) // server is optional
+      if (spx.CCGServersConfigured){
+        PlayoutCCG.clearChannelsFromGCServer(req.body.server) // server is optional
+      } 
       return res.status(200).json({ message: 'Panic executed. Layers cleared forcefully.' })
-    });
+    }); // end panic
 
-    router.get('/feedproxy', async (req, res) => {
+
+
+    router.get('/bearerAuthProxy', spxAuth.CheckAPIKey, async (req, res) => {
+      // added in 1.2.2 [UNDOCUMENTED INTENTIONALLY]
+      // This is a proxy endpoint for passing feed data from CORS protected datasources.
+      // Also this caches all requests to avoid flooding the API
+      let url, bearerAuthToken;
+      url = req.query.url.replace(/#/g, '%23'); // replace # with %23 (yuck)
+      let headers = new Headers();
+      let customCfgSection = req.query.proxyConfigSection || '';
+      bearerAuthToken = global.config.bearerAuthProxyOptions[customCfgSection].bearerAuthToken;
+
+      let timeNow = Date.now();
+      let delayMS = 5000; // <== how long to cache
+      let nextTime = apiCache[url]?.timestamp + delayMS;
+      let timeLeft = nextTime - timeNow;
+      // console.log('apiCache has ' + Object.keys(apiCache).length + ' items.');
+      if (apiCache[url] && timeLeft > 0) {
+        console.log('--Return cached API data for another ' + Math.max(timeLeft, 0) + ' ms...');
+        let returnData = apiCache[url].data;
+        //  keep only the first items in the array (to prevent memory leak)
+        let CacheItemAmount = 50
+        if (Object.keys(apiCache).length > CacheItemAmount) {
+            // console.log('apiCache BEFORE: ' + Object.keys(apiCache).length + ' items.');
+            let last = Object.keys(apiCache)[Object.keys(apiCache).length - 1];
+            delete apiCache[last] // delete last item
+            // console.log('apiCache AFTER: ' + Object.keys(apiCache).length + ' items.');
+        }
+
+        return res.status(200).json(returnData)
+      } else {
+        console.log('--Get fresh data from external API:' + url);
+        headers.set('Authorization', 'Bearer ' + bearerAuthToken);
+        fetch(url, {
+          method:'GET',
+          headers: headers,
+        })
+        .then(response => response.json())
+        .then(json => {
+          res.send(json)
+          apiCache[url] = {};
+          apiCache[url].timestamp = Date.now();
+          apiCache[url].data = json;
+        })
+        .catch(function (error) {
+          console.log(error.message);
+          return res.status(500).json({ type: 'error', message: error.message })
+        });
+      }
+    }); // end bearerAuthProxy. (Dont ask)
+
+    router.get('/feedproxy', spxAuth.CheckAPIKey, async (req, res) => {
       // added in 1.0.14
       axios.get(req.query.url)
       .then(function (response) {
@@ -359,16 +446,16 @@ router.get('/', function (req, res) {
       .catch(function (error) {
         console.log(error);
         return res.status(500).json({ type: 'error', message: error.message })
-      });
-    });
+      }); 
+    }); // end feedproxy
 
-    router.get('/getprojects', async (req, res) => {
+    router.get('/getprojects', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.1.1
       let projects = await spx.GetSubfolders(config.general.dataroot); 
       return res.status(200).json(projects)
-    });
+    }); // end getprojects
     
-    router.get('/getrundowns', async (req, res) => {
+    router.get('/getrundowns', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.1.1
       let project = req.query.project || '';
       if (!project) {
@@ -376,9 +463,9 @@ router.get('/', function (req, res) {
       }
       const fileListAsJSON = await spx.GetDataFiles(config.general.dataroot + "/" + project + "/data/");
       return res.status(200).json(fileListAsJSON)
-    });
+    }); // end getrundowns
 
-    router.get('/gettemplates', async (req, res) => {
+    router.get('/gettemplates', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.1.3
       let project = req.query.project || '';
       if (!project) {
@@ -390,9 +477,9 @@ router.get('/', function (req, res) {
       } else {
         return res.status(result[0]).json(result[1])
       }
-    });
+    }); // end gettemplates
 
-    router.get('/getlayerstate', async (req, res) => {
+    router.get('/getlayerstate', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.1.1
       // REMEMBER!  This ONLY reports items which are in memory. So if direct API commands
       //            are used to play out templates, this will not return reliable results.
@@ -423,66 +510,94 @@ router.get('/', function (req, res) {
       return res.status(200).json(layers)
     });
 
+    router.get('/executeScript', spxAuth.CheckAPIKey, async (req, res) => {
+      // This will seek for a file in ASSETS/scripts and execute it using
+      // operating systems shell.  This is a security risk, so use with caution.
+
+      // Added in 1.1.4
+      let script = req.query.file || '';
+      if (!script) {
+        return res.status(500).json({ type: 'error', message: 'Script name required as parameter (eg ?file=scriptname)' })
+      } else {
+        let scriptPath = path.resolve(spx.getStartUpFolder(),'ASSETS/scripts/', script);
+        console.log('Executing script: ' + scriptPath);
+        if (!fs.existsSync(scriptPath)) {
+          return res.status(500).json({ type: 'error', message: 'Script not found: ' + scriptPath })
+        } else {
+          // let result = await spx.ExecuteScript(scriptPath);
+          require('child_process').exec(scriptPath); // execute script
+          return res.status(200).json({ type: 'info', message: 'Executed: ' + scriptPath })
+        }
+      }
+    }); // end executeScript file
+
 
 // ITEM COMMANDS ------------------------------------------------------------------------------------
-    router.get('/item/play', async (req, res) => {
+    router.get('/item/play', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemPlay';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
-    router.get('/item/play/:id', async (req, res) => {
+    router.get('/item/play/:id', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemPlayID';
       dataOut.itemID  = req.params.id;
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
-    router.get('/item/continue', async (req, res) => {
+    router.get('/item/continue', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemContinue';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
-    router.get('/item/continue/:id', async (req, res) => {
+    router.get('/item/continue/:id', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemContinueID';
       dataOut.itemID  = req.params.id;
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
-    router.get('/item/stop', async (req, res) => {
+    router.get('/item/stop', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemStop';
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
-    router.get('/item/stop/:id', async (req, res) => {
+    router.get('/item/stop/:id', spxAuth.CheckAPIKey, async (req, res) => {
       let dataOut = {};
+      dataOut.message = 'Sent request to SPX controller.'
       dataOut.APIcmd  = 'ItemStopID';
       dataOut.itemID  = req.params.id;
       io.emit('SPXMessage2Controller', dataOut);
-      res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
+      res.status(200).json(dataOut);
     });
 
 
-    router.get('/controlRundownItemByID', async (req, res) => {
+    router.get('/controlRundownItemByID', spxAuth.CheckAPIKey, async (req, res) => {
       try {
         // added in 1.1.0 and removed obsolete datafile read/write logic
         let fold = req.query.file.split('/')[0];
         let file = req.query.file.split('/')[1];
         let RundownFile = path.join(config.general.dataroot, fold, 'data',  file + '.json');
         let dataOut = {};
+        dataOut.message       = 'Sent request to SPX server.'
         dataOut.datafile      = RundownFile;
         dataOut.epoch         = req.query.item;
         dataOut.command       = req.query.command;
         dataOut.prepopulated  = 'false';
-        res.status(200).send('Sent request to SPX server: ' + JSON.stringify(dataOut));
+        res.status(200).json(dataOut);
         spx.httpPost(dataOut,'/gc/playout')
       } catch (error) {
         res.status(500).send('Error in /api/v1/controlRundownItemByID: ' + error);
@@ -576,8 +691,8 @@ router.get('/', function (req, res) {
       }
     });
 
-    router.get('/rundown/get', async (req, res) => {
-      res.status(200).send(JSON.stringify(global.rundownData))
+    router.get('/rundown/get', spxAuth.CheckAPIKey, async (req, res) => {
+      res.status(200).json(global.rundownData)
     });
 
 

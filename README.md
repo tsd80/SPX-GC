@@ -4,9 +4,9 @@
 
 <br>
 
-Readme updated Jun 29 2022. 
+Readme updated Sept 20 2023. 
 
->  See [RELEASE_NOTES.md](RELEASE_NOTES.md) for latest changes and items currently in development. Latest binary release **v.1.1.2** Download from [spx.graphics/download](https://spx.graphics/download) or see the [builds](#builds) here.
+>  See [RELEASE_NOTES.md](RELEASE_NOTES.md) for latest changes and items currently in development. Latest binary release **v.1.2.1** Download from [spx.graphics/download](https://spx.graphics/download) or see the [builds](#builds) here.
 
 <br>
 
@@ -41,15 +41,17 @@ See the website ▶  **[spx.graphics](https://spx.graphics)**
 - [MIT License](#license)
 
 
-**SPX Graphics Controller** can be used to playout lower thirds, bumpers, logos and other on-screen graphics in live web streams or live TV broadcasts. Content for the graphic templates are entered into _elements_ which are stored on _rundowns_ within _projects_.
+**SPX Graphics Controller** can be used to playout lower thirds, bumpers, logos and other on-screen graphics in live web streams or live TV broadcasts. Playout happens using "renderer" URL's from the SPX Server. The live output can be used in various softwares, such as OBS, vMix or CasparCG using the "browser source" approach.
 
-Software is based on a NodeJS server and can be run on Windows, Mac or Linux computers, on-premise or using cloud instances for remote work scenarios.
+Content for the graphic templates are entered into _elements_ which are stored on _rundowns_ within _projects_.
+
+Software is based on a NodeJS server and can be run on Windows, Mac or Linux computers, on-premise or using cloud instances for remote production scenarios.
 
 Graphic templates are typical HTML templates used with CasparCG and other HTML compatible renderers. Integrating existing templates with SPX is done by adding _a template definition_ (javascript-snippet) to them.
 
-Originally SPX was developed by [SmartPX](https://smartpx.fi) for [YLE](https://www.yle.fi), a public broadcaster in Finland. Thanks **Markus Nygård** for the challenge! 🤘
+Originally SPX was developed by [SmartPX](https://smartpx.fi) for [YLE](https://www.yle.fi), a public broadcaster in Finland. The first version was released in September 2020. Thanks **Markus Nygård** for the challenge! 🤘
 
-> If you need custom HTML templates or functionality get in touch tuomo@smartpx.fi.
+> If you need custom graphics or systems integration please [the website](https://spx.graphics/contact).
 
 ---
 
@@ -57,7 +59,7 @@ Originally SPX was developed by [SmartPX](https://smartpx.fi) for [YLE](https://
 
 <a id="demo"></a>
 ## Live demo 🔥
-SPX running in the cloud: **http://35.228.47.121:5000**
+Live SPX demo in the cloud: **http://demo.spx.graphics:5000**
 
 > Please be aware there is just _one instance_ running for demo purposes, so expect clashes and overall quirky experience if multiple users are logged in at once. Changes made in demo are reset automatically few times a day. (Also pay attention to the version number, it may not be the latest version.)
 
@@ -66,15 +68,15 @@ SPX running in the cloud: **http://35.228.47.121:5000**
 
 <a id="testdrive"></a>
 ## Template Store & Testdrive 🔥
-A marketplace for free and premium SPX templates and plugins is opened at [spxgc.com/store](https://spxgc.com/store). Each store item can be testdriven, see these examples:
+A marketplace for free and premium SPX templates and plugins is at [spx.graphics/store](https://spx.graphics/store). Each store item can be testdriven, see these examples:
 
 | Template | Type | Link |
 | ------ | ------ | ------ |
-| **[Bug](https://www.spxgc.com/store/Bug-p291293870)** - You have logo. Why not show it?  | Free | [Test drive](http://35.228.47.121:5009/show/Template%20Demo%20-%20Bug) |
-| **[ImageLayer](https://www.spxgc.com/store/ImageLayer-p291331877)** - Pick an image and play.  | Free | [Test drive](http://35.228.47.121:5009/show/Template%20Demo%20-%20ImageLayer) |
-| **[Texter](https://www.spxgc.com/store/Texter-p291207513)** - An essential template for unbranded text.  | Premium | [Test drive](http://35.228.47.121:5009/show/Template%20Demo%20-%20Texter) |
-| **[TwoTone](https://www.spxgc.com/store/Two-Tone-p245011856)** - You have logo. Why not show it?  | Premium | [Test drive](http://35.228.47.121:5009/show/Template%20Demo%20-%20Two-Tone%20Pack) |
-| More ▶ [spxgc.com](https://www.spxgc.com/)  |  |  |
+| **[Bug](https://www.spx.graphics/store/Bug-p291293870)** - You have logo. Why not show it?  | Free | [Test drive](http://demo.spx.graphics:5009/show/Template%20Demo%20-%20Bug) |
+| **[ImageLayer](https://www.spx.graphics/store/ImageLayer-p291331877)** - Pick an image and play.  | Free | [Test drive](http://demo.spx.graphics:5009/show/Template%20Demo%20-%20ImageLayer) |
+| **[Texter](https://www.spx.graphics/store/Texter-p291207513)** - An essential template for unbranded text.  | Premium | [Test drive](http://demo.spx.graphics:5009/show/Template%20Demo%20-%20Texter) |
+| **[TwoTone](https://www.spx.graphics/store/Two-Tone-p245011856)** - You have logo. Why not show it?  | Premium | [Test drive](http://demo.spx.graphics:5009/show/Template%20Demo%20-%20Two-Tone%20Pack) |
+| And much more ▶ [spx.graphics/store](https://www.spx.graphics/store)  |  |  |
 <BR>
 > Please be aware: just _one instance_ running for demo purposes, so expect clashes and overall quirky experience if multiple users are logged in at once. Changes made in demo are reset automatically few times a day.
 
@@ -88,6 +90,7 @@ A marketplace for free and premium SPX templates and plugins is opened at [spxgc
 | ![project list](screenshots/01-spx-gc-projectlist.png) | Content is managed in _projects_. Each project can have unlimited amount of _rundowns_ and _graphics templates_. Projects and their rundowns and settings are stored in _dataroot -folder_. |
 | ![controller](screenshots/05-spx-gc-controller-rundown.png) | Main Controller: rundown with few items and a local preview. Items can be edited and controlled also with keyboard shortcuts. Fullscreen viewing mode recommended. Buttons below preview are customizeable. | 
 | [![intro video on Youtube](screenshots/yt_mockup.png)](https://www.youtube.com/watch?v=e5LTFC9MlOI) | An introduction video on Youtube. There are more images in the screenshots -folder.  | 
+| [![intro video on Youtube](screenshots/yt_mockup-showreel.png)](https://youtu.be/Ruxz4DACDT4) | A showreel of SPX Graphics.  | 
 
 ----
 
@@ -107,9 +110,9 @@ SPX can be installed using a **ready-to-go binary package** which includes all r
 
 | Package| Build date | Notes |
 |  ------ | ----- | ----- |
-| **Windows**<BR>[SPX_1_1_2_win64.zip](https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.1/SPX_1_1_2_win64.zip   ) | Jun 20 2022 | The app is cross-platform and is mostly developed and tested on Windows. Approx 56% users are on Windows.
-| **Linux**<BR>[SPX_1_1_2_linux64.zip]( https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.1/SPX_1_1_2_linux64.zip ) | Jun 20 2022 | Tested with some flavours of Debian and Ubuntu but user's input is appreciated here, see [feedback](#feedback). 38% of users are on Linux|
-| **MacOS**<BR>[SPX_1_1_2_macos64.zip]( https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.1/SPX_1_1_2_macos64.zip ) | Jun 20 2022 | If any installation issues, please see this [Knowledge base article](https://spxgc.tawk.help/article/spx-gc-installation-steps). 6% of current users are on Mac.|
+| **Windows**<BR>[SPX_1_2_1_win64.zip](https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.2/SPX_1_2_1_win64.zip   ) | Sep 20 2023 | The app is cross-platform and is mostly developed and tested on Windows. Approx 57% users are on Windows.
+| **Linux**<BR>[SPX_1_2_1_linux64.zip]( https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.2/SPX_1_2_1_linux64.zip ) | Sep 20 2023 | Tested with some flavours of Debian and Ubuntu but user's input is appreciated here, see [feedback](#feedback). 32% of users are on Linux|
+| **MacOS**<BR>[SPX_1_2_1_macos64.zip]( https://storage.googleapis.com/spx-gc-bucket-fi/installers/1.2/SPX_1_2_1_macos64.zip ) | Sep 20 2023 | If any installation issues, please see this [Knowledge base article](https://spxgc.tawk.help/article/spx-gc-installation-steps). 11% of users are on Mac.|
 
 > For links to older packages see [RELEASE_NOTES](RELEASE_NOTES.md).
  Please [get in touch](#feedback) if you have problems downloading or installing these files.
@@ -151,7 +154,7 @@ npm install
 # on Windows:
 npm run dev
 
-# On a Mac there is currently an issue when running SPX with nodemon which causes command line arguments to get mixed up. On Mac run the app with Node traditionally without hot reloading:
+# Or without hot reloading:
 node server.js
 
 ```
@@ -230,7 +233,7 @@ Start making [configuration changes](#config) or creating [projects](#dataroot) 
 3. Go to **Projects**
 4. Add a new project, for instance `My First Project`. (Project's settings opens.)
 5. Click **[ + ]** button to add the first template to the project
-6. Browse to `smartpx > Template_Pack_1` -folder and choose `SPX1_INFO_LEFT.html` -template
+6. Browse to `softpix > Template_Pack_1` -folder and choose `SPX1_INFO_LEFT.html` -template
 7. Go back to **Projects**
 8. Double click `My First Project` to open it
 9. Add a new rundown to this project, for instance `My First Rundown`. (The new empty rundown opens.)
@@ -260,7 +263,7 @@ The default configuration file name is `config.json` but it is possible to run t
 
 To run the server with another config, provide the config file as the first command line argument, for example:
 ```sh
-SPX-GC_win64.exe myOtherConfig.json
+SPX_win64.exe myOtherConfig.json
 ```
 
 
@@ -281,7 +284,10 @@ An example `config.json` of the SPX server
     "renderer": "normal",
     "resolution": "HD",
     "launchchrome": false,
-    "disableConfigUI": true
+    "disableConfigUI": true,
+    "apikey": "",
+    "disableLocalRenderer": false,
+    "disableSeveralControllersWarning": false
   },
   "casparcg": {
     "servers": [
@@ -372,7 +378,7 @@ Localization credits:
 
 Starting from v.1.0.12 SPX does not have a CasparCG server assigned by default in the [configuration](#config). To add CasparCG server(s) go to Configuration and scroll down to CasparCG servers. Add a new server by giving it name such as `OVERLAY`, `ip-address` (or `localhost`) and a `port` number (5250 is CasparCG's default port). Click on Save at the bottom of the page and there will be an empty line to add another server. Add as many as you have in your production, such as OVERLAY (for CG's), VIDEOWALL, FULLSCREEN etc... 
 
-> The name `OVERLAY` is preferred, since this name is used in all [SPX Store](https://spxgc.com/store) templates and the default template pack which comes with the application. **Note:** use only alphanumeric names for CasparCG servers, without special characters or spaces.
+> The name `OVERLAY` is preferred, since this name is used in all [SPX Store](https://spx.graphics/store) templates and the default template pack which comes with the application. **Note:** use only alphanumeric names for CasparCG servers, without special characters or spaces.
 
 <img src="./screenshots/ccgservers.png" align="right" width="450" style="vertical-align:middle;margin-right:10px; margin-top:10px">
 
@@ -698,7 +704,7 @@ TemplateDefinition configures how a template is supposed to work within SPX; wha
                 "fcall": "myCustomHello('world')"
             },
             {
-                "ftype:": "spacer"
+                "ftype": "spacer"
             },
             {
                 "field": "f8",
@@ -776,12 +782,14 @@ See available commands here:
 http://localhost:5656/api/v1
 ```
 
+See an article on using the SPX API: https://spxgc.tawk.help/article/help-api and download a sample project for developing your own custom SPX Extensions.
+
 SPX can also be used with Bitfocus Companion, see https://bitfocus.io/companion. Companion version 2 will have a built in module with presets for SPX.
 
 > **OSC -protocol** is not supported in SPX 1.0.x but will be added in a future version.
 
 # Plugins and Extensions <a id="plugins"></a>
-Version 1.0.10 introduced `ASSETS/plugins` -folder for additional functionality, such as custom function triggering `plugin buttons` and `extensions` which are additional user interfaces or panels. For instance [Scoreboard](https://www.spxgc.com/store/Scoreboard-plugin-p313595701) is a sports clock extension with an independent user interface. Another example is a SocialPlayout - an upcoming extension for moderating and LIVE playout of social messages from various social media platforms, such as Twitter, Instagram, Facebook, Youtube, etc.
+Version 1.0.10 introduced `ASSETS/plugins` -folder for additional functionality, such as custom function triggering `plugin buttons` and `extensions` which are additional user interfaces or panels. For instance [Scoreboard](https://www.spx.graphics/store/Scoreboard-plugin-p313595701) is a sports clock extension with an independent user interface. Another example is a SocialPlayout - an upcoming extension for moderating and LIVE playout of social messages from various social media platforms, such as Twitter, Instagram, Facebook, Youtube, etc.
 
 Each plugin has a subfolder with at least an init.js file and optionally other folders and files, such as html, css and js.
 
@@ -816,18 +824,30 @@ New releases will try address found issues and bugs in older versions and they w
 | Release | Planned features (subject to change)| Timeframe |
 | ------ | ------ | ----- |
 | 1.1  | ~~Mac install folder [issue (#3)](/../../issues/3) fix~~. ~~Help page update~~, ~~internal logic change to fix [playlist item issue (#1)](/../../issues/1)~~, ~~http protocol for CasparCG templates~~, simple rundown view for mobile / tablet browsers, automatically running rundowns, item grouping, ~~textarea control~~, ~~item / file duplication~~. Project and ~~rundown~~ rename. ~~Export/import CSV~~| TBD |
-| X.X  | Under consideration: OSC support, Built-in NDI support, mediafile picker, video playback control templates, ~~graphics preview~~, ~~MIDI interface~~, global extras editor in appconfig, ~~public API for controls~~, ~~HTML template store~~,  community marketplace. Video tutorials. ~~Knowledgebase~~. Forum. Slack support channel. Free lunches. | TBD |
+| X.X  | Under consideration: OSC support, Built-in NDI support, mediafile picker, video playback control templates, ~~graphics preview~~, ~~MIDI interface~~, global extras editor in appconfig, ~~public API for controls~~, ~~HTML template store~~,  community marketplace. ~~Video tutorials.~~ ~~Knowledgebase~~. Forum. ~~Discord support channel.~~ Free lunches. | TBD |
 
 Strikethrough items are already done.<BR>
 Visit [spx.kampsite.co](https://spx.kampsite.co) to discuss the roadmap.
 
-
 <BR>
-
 ----
 
 # MIT License <a id="license"></a>
-Copyright 2020-2022 Tuomo Kulomaa <tuomo@smartpx.fi> & [Softpix Ltd](http://softpix.io) 
+Copyright 2020-2023 Tuomo Kulomaa <tuomo@softpix.io> & [Softpix Ltd](http://softpix.io) 
 
 This project is licensed under the terms of the MIT license.
 See [LICENSE.txt](LICENSE.txt)
+
+---
+
+## SPX Graphics for Zoom
+
+<img src="screenshots/spx-zoom.png" width="300" align="right">
+
+Have you seen this yet? [SPX Graphics for Zoom](https://spx.graphics/zoom)
+
+SPX Graphics as native Zoom Marketplace application. Install for **free** and use professionally designed and animated live graphics right within the Zoom client. No need to install any software on the computer or use software switchers or virtual cameras. More designs and graphics layers can be added from SPX Store. We also provide customized graphics packages to Enterprise users. Please [contact us](https://spx.graphics/contact) for more info.
+
+Install the app FOR FREE now: **[ Add to Zoom ](https://bit.ly/zoom-us-authorize-spx-graphics-button)**
+
+

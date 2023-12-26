@@ -29,6 +29,10 @@ const axios = require('axios')
 // const { config } = require("winston"); // <!-- this is auto-generated here by the IDE and will screw things up! Beware >:-[
 // global.rundownData is introduced in server.js 
 
+// May need to add custom header capabilities from config.json
+
+
+
 // ROOT ROUTES ----------------------------------------------------------------------------------------------
 router.get('/', spxAuth.CheckLogin, cors(), spx.getNotificationsMiddleware, async function (req, res) {
   await SaveRundownDataToDisc(); // Added in 1.0.15
@@ -122,18 +126,14 @@ router.get('/renderwindow/:type', function (req, res) {
   }
 });
 
-
-
 router.get('/logout', spxAuth.Logout, function (req, res) {
   res.redirect('/');
 });
-
 
 router.post('/', spxAuth.CheckLogin, function (req, res) {
   //logger.info('User "' + req.session.user + '" logged in');
   res.redirect('/');
 });
-
 
 router.post('/saveauthpolicy', function (req, res) {
   // save settings to config and move on
@@ -177,9 +177,6 @@ router.post('/saveauthpolicy', function (req, res) {
     };
 });
 
-
-
-
 router.get('/config', cors(), spxAuth.CheckLogin, async (req, res) => {
   // show application config (send global.config as "config" data to the view, see options object below)
   await SaveRundownDataToDisc(); // Added in 1.0.15
@@ -193,10 +190,6 @@ router.get('/config', cors(), spxAuth.CheckLogin, async (req, res) => {
     recents: recents,
     disableConfigUI: disableConfigUI});
 });
-
-
-
-
 
 router.post('/config', spxAuth.CheckLogin, async (req, res) => {
   // save incoming json form data to config.json and reload the page
@@ -270,7 +263,6 @@ router.post('/config', spxAuth.CheckLogin, async (req, res) => {
 
 });
 
-
 router.get('/register', cors(), spxAuth.CheckLogin, async (req, res) => {
   // show application config (send global.config as "config" data to the view, see options object below)
   await SaveRundownDataToDisc(); // Added in 1.0.15
@@ -283,7 +275,6 @@ router.get('/register', cors(), spxAuth.CheckLogin, async (req, res) => {
     configfile: configfileref, 
   });
 });
-
 
 router.post('/register', async (req, res) => {
   // Handles modification changes of registratiom.
@@ -328,8 +319,6 @@ router.post('/register', async (req, res) => {
   };
 });
 
-
-
 router.get('/shows', cors(), spxAuth.CheckLogin, async (req, res) => {
   // show list of shows (folders)
   await SaveRundownDataToDisc(); // Added in 1.0.15
@@ -345,7 +334,6 @@ router.get('/shows', cors(), spxAuth.CheckLogin, async (req, res) => {
     config: config,
     disableConfigUI: disableConfigUI});
 });
-
 
 router.get('/show/:foldername', cors(), spxAuth.CheckLogin, async (req, res) => {
   // Show episodes (files in folder 'data')
@@ -396,7 +384,6 @@ router.get('/show/:foldername/config', cors(), spxAuth.CheckLogin, async (req, r
   });
 });
 
-
 router.post('/show/:foldername/config/removeTemplate', spxAuth.CheckLogin, async (req, res) => {
   //  Remove template index (0 based)
   logger.verbose('Removing template from profile ' + req.body.showFolder );
@@ -426,7 +413,6 @@ router.post('/show/:foldername/config/removeTemplate', spxAuth.CheckLogin, async
   }; //file written
 });
 
-
 router.post('/show/:foldername/config/removeExtra', spxAuth.CheckLogin, async (req, res) => {
   //  Remove extra index (0 based)
   logger.verbose('Removing extra from profile ' + req.body.showFolder );
@@ -443,8 +429,6 @@ router.post('/show/:foldername/config/removeExtra', spxAuth.CheckLogin, async (r
       logger.error('removeExtra Error while saving file: ' + error);
   }; //file written
 });
-
-
 
 router.post('/show/:foldername/config/saveExtra', spxAuth.CheckLogin, async (req, res) => {
   //  Save extra index (0 based)
@@ -493,9 +477,6 @@ router.post('/show/:foldername/config/saveExtra', spxAuth.CheckLogin, async (req
   }; //file written
 });
 
-
-
-
 router.post('/show/:foldername/config/saveTemplate', spxAuth.CheckLogin, async (req, res) => {
   // Save template index (0 based)
   // This runs when template is modified in show config
@@ -543,7 +524,6 @@ router.post('/show/:foldername/config/saveGeneralSettings', spxAuth.CheckLogin, 
   }; //file written
 });
 
-
 router.post('/show/:foldername/config', spxAuth.CheckLogin, async (req, res) => {
   // a POST handler for adding content to the <show>/profile.json.
   // 
@@ -569,132 +549,20 @@ router.post('/show/:foldername/config', spxAuth.CheckLogin, async (req, res) => 
     let replaceIndex = req.body.replaceIndex || ""; // v.1.0.11 replace existing, a reimport
 
     switch (command) {
+
+      case 'addtemplates':
+        // Added in 1.1.4
+        // ADD SEVERAL TEMPLATES AT ONCE
+        let templates = JSON.parse(req.body.templates || []); 
+        templates.forEach((template,index) => {
+          TemplatePath = path.join(curFolder, template).trim();
+          profileData = addTemplateToProfile(profileData, TemplatePath, showFolder, curFolder, replaceIndex)
+        });
+        break;
+
       case 'addtemplate':
-        // ------------------------------------------------------------- ADDING (or RE-ADDING) A TEMPLATE -----------------
-        // save the folder to app globals for the next potential need...
-
-        // scan the file for SPXConfig
-        if ( replaceIndex ) {
-          // when replacing, the path does not come with absolute
-          // path, must append
-          TemplatePath = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates', TemplatePath)
-          global.LastBrowsedTemplateFolder = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates', curFolder); // Bugfix added in 1.1.1
-        } else {
-          // we are adding (not re-importing) so this works
-          global.LastBrowsedTemplateFolder = curFolder;
-        }
-
-        // console.log('Added template: ' + TemplatePath);
-        logger.verbose('Added template: ' + TemplatePath);
-        let templateContents = fs.readFileSync(TemplatePath, "utf8")
-        let templatehtml = templateContents.toString();
-
-        /*
-          FIXME: JSDOM loading via a promise
-
-          JSDOM is used to parse html template for the SPXGCTemplateDefinition.
-          Now it produces error messages for eventListeners in the template files
-          and potentially crashes SPX server if there are onLoad function calls
-          in template <body> tag.
-
-          Refactoring JSDOM call into a promise might do the job. Read this:
-          https://github.com/jsdom/jsdom/issues/2557
-
-        */
-
-        console.log('\nTEMPLATE IMPORT NOTE:');
-        console.log('Messages below are from template "' + TemplatePath + '".\nonLoad() event handlers or other issues can yield messages.\n')
-
-        const dom = new JSDOM(templatehtml, { runScripts: "dangerously" });
-        let SPXGCTemplateDefinition = dom.window.SPXGCTemplateDefinition || 'notFound'; // there must be "window.SPXGCTemplateDefinition{}" -object in template file!
-
-        if (SPXGCTemplateDefinition=="notFound"){
-          logger.warn('Cancel: Template ' + TemplatePath + ' did not had SPXGCTemplateFields[].' );
-          res.redirect('/show/' + showFolder + '/config?ERR=templateDefinitionMissing');
-          return
-        }
-
-        // set defaults if not defined in the template
-        if (!SPXGCTemplateDefinition.description) {SPXGCTemplateDefinition.description = ""};
-        if (!SPXGCTemplateDefinition.playserver)  {SPXGCTemplateDefinition.playserver  = "-"};
-        if (!SPXGCTemplateDefinition.playchannel) {SPXGCTemplateDefinition.playchannel = "1"};
-        if (!SPXGCTemplateDefinition.playlayer)   {SPXGCTemplateDefinition.playlayer   = "20"};
-        if (!SPXGCTemplateDefinition.webplayout)  {SPXGCTemplateDefinition.webplayout  = "-"};
-        if (!SPXGCTemplateDefinition.onair)       {SPXGCTemplateDefinition.onair       = "false"};
-        if (!SPXGCTemplateDefinition.out)         {SPXGCTemplateDefinition.out         = "manual"};
-        if (!SPXGCTemplateDefinition.dataformat)  {SPXGCTemplateDefinition.dataformat  = "xml"};
-        if (!SPXGCTemplateDefinition.uicolor)     {SPXGCTemplateDefinition.uicolor     = "0"};
-
-        // v.1.0.15 add imported timestamp
-        SPXGCTemplateDefinition.imported = String(Date.now()); // epoch. This COULD be used to compare template versions in profile/rundown.
-
-        // v.1.0.14 add note if no fields
-        if ( !SPXGCTemplateDefinition.DataFields ||  SPXGCTemplateDefinition.DataFields.length === 0) {
-          let emptyData = {}
-          emptyData.ftype = 'instruction'
-          emptyData.value = 'No editable fields'
-          SPXGCTemplateDefinition.DataFields = [emptyData];
-        }
-    
-        let absPath = TemplatePath.split("\\").join("/");
-        let templateRootPath = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates');
-        // let tmpRoot = config.general.templatefolder.split("\\").join("/");
-        let tmpRoot = templateRootPath.split("\\").join("/");
-        SPXGCTemplateDefinition.relpath = absPath.split(tmpRoot)[1];
-        // console.log('New SPXGCTemplateDefinition',SPXGCTemplateDefinition);
-
-        if (profileData.templates){
-          // add to existing templates
-          if (replaceIndex) {
-            // v.1.0.11 Replace existing template item
-            profileData.templates[replaceIndex] = SPXGCTemplateDefinition;
-          } else {
-            // add new one to the end
-            profileData.templates.push(SPXGCTemplateDefinition);
-          }
-        } else {
-          // create new templates array
-          profileData.templates=[SPXGCTemplateDefinition];
-        }
-
-        // Scan each template field for potential project variables ("prvar")
-        // and add them to the profile.
-        profileData.templates.forEach(function(template, index) {
-          template.DataFields.forEach(function(field, index) {
-            if (field.prvar) {
-              console.log('WIP - Found prvar in template field: ' + field.prvar);
-              if (!profileData.variables) {
-                profileData.variables = [];
-              }
-              // TODO: Bug here! This will overwrite existing variables with same name!
-
-              let foundOld = false;
-              profileData.variables.forEach(function(variable, index) {
-                if (variable.prvar === field.prvar) {
-                  console.log('WIP - Found existing variable: ' + variable.prvar);
-                  foundOld = true;
-                  variable.ftype = field.ftype;
-                  variable.title = field.title;
-                  variable.value = field.value;
-                  if (!variable.users.includes(template.relpath)) {
-                    variable.users.push(template.relpath);
-                  }
-                }
-              })
-
-              if (!foundOld) {
-                let varItem = {}
-                varItem.prvar = field.prvar;
-                varItem.ftype = field.ftype;
-                varItem.title = field.title;
-                varItem.value = field.value;
-                varItem.users = [template.relpath];
-                profileData.variables.push(varItem);
-              }
-            }
-          })
-        })
-
+        // ADD (or RE-IMPORT) A TEMPLATE
+        profileData = addTemplateToProfile(profileData, TemplatePath, showFolder, curFolder, replaceIndex)
         break;
 
       case 'addshowextra':
@@ -783,8 +651,6 @@ router.post('/show/:foldername/config', spxAuth.CheckLogin, async (req, res) => 
 }); // browseTemplates API post request end
 
 
-
-
 router.post('/shows/', spxAuth.CheckLogin, async (req, res) => {
   // add a new showfolder (with /data -subfolder) and open it for configuration
   let targetFolder = path.join(config.general.dataroot, req.body.foldername);
@@ -801,7 +667,6 @@ router.post('/shows/', spxAuth.CheckLogin, async (req, res) => {
       res.redirect('/show/' + req.body.foldername + '/config');
   }
 });
-
 
 
 router.post('/show/:foldername', spxAuth.CheckLogin, async (req, res) => {
@@ -828,8 +693,6 @@ router.post('/show/:foldername', spxAuth.CheckLogin, async (req, res) => {
     }; //file written
   }
 });
-
-
 
 
 router.delete('/show/:folder/:file', spxAuth.CheckLogin, async (req, res) => {
@@ -889,13 +752,13 @@ router.delete('/shows/:foldername', spxAuth.CheckLogin, async (req, res) => {
 });
 
 
-
 router.get('/gc/:foldername/:filename', cors(), spxAuth.CheckLogin, async (req, res) => { 
   // G R A P H I C   C O N T R O L L E R   M A I N   V I E W
   let datafile = path.join(config.general.dataroot, req.params.foldername,'data', req.params.filename) + '.json';
+  
   const fileDataAsJSON = await GetJsonData(datafile);
   global.rundownData = fileDataAsJSON; // added in 1.0.15 populate rundown data to memory
-  global.rundownData.filepath = datafile;
+  // global.rundownData.filepath = datafile; // TODO: Removed in 1.2.0. Is this needed?!
 
   let showprofile = path.join(config.general.dataroot, req.params.foldername, 'profile.json');
   const profileDataJSONobj = await GetJsonData(showprofile);
@@ -919,12 +782,12 @@ router.get('/gc/:foldername/:filename', cors(), spxAuth.CheckLogin, async (req, 
     height  = 2160;
   }
 
-  // these added in 1.1.0
-  let recents       = config.general.recents  || []        
-  let preview       = config.general.preview  || 'none'    
-  let rnrtype       = config.general.renderer || 'normal'  
-  let assetsFolder  = path.resolve(spx.getStartUpFolder(),'ASSETS') || ''
+  let recents       = config.general.recents  || [] // added in 1.1.0
+  let preview       = config.general.preview  || 'none' // added in 1.1.0
+  let rnrtype       = config.general.renderer || 'normal'  // added in 1.1.0
+  let assetsFolder  = path.resolve(spx.getStartUpFolder(),'ASSETS') || '' // added in 1.1.0
   let disableConfigUI = config.general.disableConfigUI || false // added in 1.1.1
+  let disableLRenderer = config.general.disableLocalRenderer || false // added in 1.2.0
 
   res.render('view-controller', {
     layout:         false,
@@ -946,6 +809,7 @@ router.get('/gc/:foldername/:filename', cors(), spxAuth.CheckLogin, async (req, 
     assetsFolder:   assetsFolder,
     disableConfigUI: disableConfigUI,
     config:         config,
+    disableLRender: disableLRenderer
   });
 
   let bgImage = ''
@@ -1173,22 +1037,41 @@ router.post('/gc/:foldername/:filename/', spxAuth.CheckLogin, async (req, res) =
 
       break;
 
-    case 'addItemToRundown': 
-      // ADD TEMPLATE ITEM TO RUNDOWN ///////////////////////////////////////////////////////////////////////////////////////////////////
+    case 'addAllItemsToRundown': 
+      // ADD ALL TEMPLATES TO RUNDOWN /// Added in 1.2.0
+      try {      
+        logger.verbose('Adding all show profile templates to rundown ' + data.listname );
+        showprofile = path.join(config.general.dataroot, data.foldername, 'profile.json');
+        profileDataJSONobj = await GetJsonData(showprofile);
+        let ProfileTemplatesArray = profileDataJSONobj.templates || [];
+
+        ProfileTemplatesArray.forEach((template,index) => {
+          template.itemID = String(Date.now()+index); // generate EPOCH for each template
+        });
+
+        rundownDataJSONobj = await GetJsonData(data.datafile);
+        if (!rundownDataJSONobj.templates) {
+          rundownDataJSONobj.templates=ProfileTemplatesArray;
+        } else {
+          rundownDataJSONobj.templates = rundownDataJSONobj.templates.concat(ProfileTemplatesArray);
+        }
+        await spx.writeFile(data.datafile, rundownDataJSONobj);
+        res.redirect('/gc/' + data.foldername + '/' + data.listname);  
+        return;
+      } catch (error) {
+          logger.error('addAllItemsToRundown Error while saving file: ', error);
+      }; //file written
+      break;
+
+    case 'addItemToRundown':
+      // ADD TEMPLATE ITEM TO RUNDOWN ///////
       try {      
         logger.verbose('Adding show profile template[' + data.templateindex + '] to rundown ' + data.listname );
-        // console.log('Adding template[' + data.templateindex + '] from show profile to rundown file ' + data.datafile );
-        // * read template[index] from show profile
         showprofile = path.join(config.general.dataroot, data.foldername, 'profile.json');
         profileDataJSONobj = await GetJsonData(showprofile);
         let TemplateModel = profileDataJSONobj.templates[data.templateindex];
-
         TemplateModel.itemID = String(Date.now());  // Generate ID (epoch milliseconds) for this rundown item (from v. 0.9.8 onwards)
                                                     // This will be used to control UI (play, remove, sort, etc...)
-
-        // console.log('data', data);
-        // console.log('TemplateModel', TemplateModel);
-
         rundownDataJSONobj = await GetJsonData(data.datafile);
         if (!rundownDataJSONobj.templates) {
           rundownDataJSONobj.templates=[];
@@ -1201,7 +1084,6 @@ router.post('/gc/:foldername/:filename/', spxAuth.CheckLogin, async (req, res) =
           logger.error('addItemToRundown Error while saving file: ', error);
           // console.log('addItemToRundown Error while saving file: ', error);
       }; //file written
-      break;
 
     case 'removeItemFromRundown': 
       // REMOVE TEMPLATE ITEM FROM RUNDOWN (without reloading page) ///////////////////////////////////////////////////////////////////////////
@@ -1238,7 +1120,7 @@ router.post('/gc/:foldername/:filename/', spxAuth.CheckLogin, async (req, res) =
       var duplicateData = "";
       var duplicated = false;
 
-      logger.info('Cloning item [' + data.sourceEpoch + '] to [' + freshID + '] in file [' + data.listname + '].');
+      logger.verbose('Cloning item [' + data.sourceEpoch + '] to [' + freshID + '] in file [' + data.listname + '].');
       rundownDataJSONobj = await GetJsonData(data.datafile);
 
       var NewTemplateArray = [];
@@ -1295,7 +1177,6 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
   //        after being in the rundown view (so memory has been populated).
 
   let templateIndex = -1; // was 0 
-
   try {
     let dataOut     = {}; // new object
     dataOut.fields  = []; // init it with an empty arr as placeholder
@@ -1307,7 +1188,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
       // data in pre-generated coming in. So we can just pass that along.
       logger.verbose('Playout command prepopulated [' + req.body.command + '] template [' + req.body.relpath + '].');
       dataOut = req.body;
-      if ( req.body.command != 'invoke') {
+      if ( req.body.command != 'invoke' && req.body.command != 'stop') { // added stop in 1.1.4
         dataOut.relpathCCG = req.body.relpath.split('.htm')[0]; // casparCG needs template path without extension
       }
       preventSave = true;
@@ -1326,8 +1207,6 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
         notifyDataSource = 'from memory:'
         RundownData = global.rundownData; // use memory only 
       }
-      // console.log('RundownData ' + notifyDataSource, RundownData);
-
       RundownData.templates.forEach((template,index) => {
         if (template.itemID == req.body.epoch) {
             templateIndex=index;
@@ -1335,7 +1214,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
       });
 
       if (templateIndex<0) {
-        throw 'TemplateIndex ' + templateIndex + ' not found using ID ' + req.body.epoch+ '.';
+        throw 'Requested item ' + req.body.epoch + ' not found on current rundown! Aborting ' + req.body.command + ' command.'; 
       }
 
       let ItemData = RundownData.templates[templateIndex];
@@ -1372,9 +1251,11 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
               FieldItem.value = temp2;
             }
             dataOut.fields.push(FieldItem);
-            dataOut.fields.push({'field':'epochID', 'value':req.body.epoch}); // 1.0.12 eventID for "calling home"
-        }
-      });
+          }
+        });
+        // 1.0.12 eventID for "calling home"
+        // 1.1.15 moved out from the forEach loop
+        dataOut.fields.push({'field':'epochID', 'value':req.body.epoch}); 
     } // else
     
     let playOutCommand = "";
@@ -1394,7 +1275,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
 
         // Send PlayoutWEB.functionCalls() if any ---------------------
         if (dataOut.webplayout!='-' && config.general.preview!='none' ) {
-          dataOut.webplayout = 1; // force to layer 1!
+          dataOut.webplayout = '1'; // force to layer 1! Changed to string in 1.0.15
           logger.verbose('Webplayout PREVIEW: ' + dataOut.webplayout);
           dataOut.playmode = 'preview';
           dataOut.spxcmd = 'playTemplate';
@@ -1408,29 +1289,24 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
       case 'play':
 
         // Send PlayoutCCG.functionCalls() if any ---------------------
-        if ( dataOut.playserver!='-' && spx.CCGServersConfigured ){
+        if ( dataOut.playserver && dataOut.playserver!='-' && spx.CCGServersConfigured ) { // 1.1.3 added dataOut.playserver
           dataOut.command="ADD";
           logger.verbose('CasparCG play: [' + dataOut.relpathCCG + '] ' + dataOut.playserver + '/' + dataOut.playchannel + '-' + dataOut.playlayer);
           PlayoutCCG.playoutController(dataOut);
-        }
-        else
-        {
+        } else {
           logger.verbose('No CasparCG playout');
         }
         
         if (!preventSave) {RundownData.templates[templateIndex].onair='true';} // moved from inside of CCG
 
         // Send PlayoutWEB.functionCalls() if any ---------------------
-        if (dataOut.webplayout!='-') {
+        if (dataOut.webplayout && dataOut.webplayout!='-') {
           logger.verbose('Webplayout PLAY: ' + dataOut.webplayout);
           dataOut.spxcmd = 'playTemplate';
           PlayoutWEB.webPlayoutController(dataOut); // refactored 20.08.2020 (note, this function handles all play, stop, next, update commands)
-          } // if web
-        else
-          {
-          logger.verbose('No Webplayout playout');
-        }  // else web 
-
+        } else {
+          logger.warn('No Webplayout playout layer given');
+        }
 
         // iterate all templates and allow only the latest update (for same playout) to be on-air at once
         if (RundownData.templates){
@@ -1566,7 +1442,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
 
 
       default:
-        logger.warn('/gc/playout did not recognize command [' + playOutCommand + '].');
+        logger.warn('/gc/playout did not recognize command "' + playOutCommand + '".');
         break;
     }
 
@@ -1578,7 +1454,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
       }
     // res.status(200).send('Playout commands processed.'); // ok 200 AJAX RESPONSE
 
-    // Check if file exists. Function implroved in 1.1.3
+    // Check if file exists. Function improved in 1.1.3
     if (dataOut.relpath) {
       let templateAbsPath = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates', dataOut.relpath);
       if (!fs.existsSync(templateAbsPath)) {
@@ -1588,7 +1464,7 @@ router.post('/gc/playout', spxAuth.CheckLogin, async (req, res) => {
     res.status(200).send(); // ok 200 AJAX RESPONSE
   } // end try
   catch (error) {
-    logger.error('ERROR in /gc/playout [' + error + '].');
+    logger.error('ERROR in /gc/playout. ' + error);
     res.status(500).send('Error in /gc/playout: ' + error)  // error 500 AJAX RESPONSE
   };
 });
@@ -1621,7 +1497,6 @@ router.post('/gc/controlvideo', spxAuth.CheckLogin, async (req, res) => {
 }); // control ended
 
 
-
 router.post('/gc/clearPlayouts', spxAuth.CheckLogin, async (req, res) => {
   // Slightly improved in v.1.0.12
   try {
@@ -1648,7 +1523,7 @@ router.post('/gc/clearPlayouts', spxAuth.CheckLogin, async (req, res) => {
   catch (error)
     {
       logger.error('Error in gc/clearPlayouts while clearing channels. [' + error + '].');
-      res.status(500).send('GC error in gc/clearPlayouts [' + error + '].')  // error 500 AJAX RESPONSE
+      res.status(500).send('SPX error in gc/clearPlayouts [' + error + '].')  // error 500 AJAX RESPONSE
     };
 
 });
@@ -1675,7 +1550,6 @@ router.post('/gc/clearPlayouts', spxAuth.CheckLogin, async (req, res) => {
 //       res.status(500).send('Server error in  /gc/saveOnairState [' + error + '].')  // error 500 AJAX RESPONSE
 //     };
 // });
-
 
 
 router.post('/gc/sortTemplates', spxAuth.CheckLogin, async (req, res) => {
@@ -1774,9 +1648,6 @@ router.post('/gc/saveConfigChanges', spxAuth.CheckLogin, async (req, res) => {
 });
 
 
-
-
-
 router.post('/gc/saveItemChanges', spxAuth.CheckLogin, async (req, res) => {
   // Handles modification changes of a template in the rundown.
   // Request: form data as JSON
@@ -1826,49 +1697,148 @@ router.post('/gc/saveItemChanges', spxAuth.CheckLogin, async (req, res) => {
 
 // FUNCTIONS --------------------------------------------------------------------------------------------------
 
-/*
-async function GetSubfolders(strFOLDER) {
-  // return a list of all subfolders in a given folder
-  // console.log('Trying to get subfolders of ' + strFOLDER);
-  try {
-    let FOLDER = path.normalize(strFOLDER);
-    return fs.readdirSync(FOLDER).filter(function (file) {
-      return fs.statSync(FOLDER+'/'+file).isDirectory();
-    });
-  }
-  catch (error) {
-    logger.error('Failed to read folder ' + strFOLDER + ': ' + error);
-    return (error);
-  }
-} // GetDataFiles ended
-*/
 
-/*
+function addTemplateToProfile(profileData, TemplatePath, showFolder, curFolder, replaceIndex=null) {
 
-async function GetDataFiles(FOLDERstr) {
-  // return a list of all json files in the dataroot folder
-  logger.debug("Getting json files from " + FOLDERstr + "...");
-  let FOLDER = path.normalize(FOLDERstr);
-  let jsonData = [];
-  try {
-    // console.log('reading',FOLDER);
-    
-    fs.readdirSync(FOLDER).forEach(file => {
-      let bname = path.basename(file, '.json');
-      let ext = path.extname(file).toUpperCase();
-      if (ext == ".JSON") {
-        // console.log('Filename', bname);
-        jsonData.push(bname);
+  // console.log('');
+  // console.log('addTemplateToProfile ===================================');
+  // console.log('ProfileData............................: ', profileData);
+  // console.log('curFolder...Filesystem template path...: ', curFolder);
+  // console.log('TemplatePath --------------------------: ', TemplatePath);
+  // console.log('showFolder ....SPX Project name .......: ', showFolder);
+  // console.log('replaceIndex ..........................: ', replaceIndex);
+
+  // save the folder to app globals for the next potential need...
+  if ( replaceIndex ) {
+    // when replacing, the path does not come with absolute path, must append
+    TemplatePath = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates', TemplatePath)
+    global.LastBrowsedTemplateFolder = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates', curFolder); // Bugfix added in 1.1.1
+  } else {
+    // we are adding (not re-importing) so this works
+    global.LastBrowsedTemplateFolder = curFolder;
+  }
+
+
+  logger.verbose('Added template: ' + TemplatePath);
+  let templateContents = fs.readFileSync(TemplatePath, "utf8")
+  let templatehtml = templateContents.toString();
+
+    // FIXME: JSDOM loading via a promise
+
+    // JSDOM is used to parse html template for the SPXGCTemplateDefinition.
+    // Now it produces error messages for eventListeners in the template files
+    // and potentially crashes SPX server if there are onLoad function calls
+    // in template <body> tag.
+
+    // Refactoring JSDOM call into a promise might do the job. Read this:
+    // https://github.com/jsdom/jsdom/issues/2557
+
+
+  let importMessage = '\n\n- SPX TEMPLATE IMPORT NOTIFICATION --------------------------------\n';
+     importMessage += ' Potential errors below this notification are from the template:\n';
+     importMessage += ' ' + TemplatePath + '\n\n';
+     importMessage += ' onLoad() or other root functions in the template MAY yield errors\n';
+     importMessage += ' or other messages during import and these can usually be ignored\n';
+     importMessage += ' safely. For more info search SPX KnowledgeBase for "Import errors".\n';
+     importMessage += '-------------------------------------------------------------------\n';
+  console.log(importMessage)
+
+  const dom = new JSDOM(templatehtml, { runScripts: "dangerously" });
+  let SPXGCTemplateDefinition = dom.window.SPXGCTemplateDefinition || 'notFound'; // there must be "window.SPXGCTemplateDefinition{}" -object in template file!
+
+  // console.log('\n\n----------------------- Import done ----------------------------\n\n');
+  
+  if (SPXGCTemplateDefinition=="notFound"){
+    logger.warn('Cancel: Template ' + TemplatePath + ' did not had SPXGCTemplateFields[].' );
+    res.redirect('/show/' + showFolder + '/config?ERR=templateDefinitionMissing');
+    return
+  }
+
+  // set defaults if not defined in the template
+  if (!SPXGCTemplateDefinition.description) {SPXGCTemplateDefinition.description = ""};
+  if (!SPXGCTemplateDefinition.playserver)  {SPXGCTemplateDefinition.playserver  = "-"};
+  if (!SPXGCTemplateDefinition.playchannel) {SPXGCTemplateDefinition.playchannel = "1"};
+  if (!SPXGCTemplateDefinition.playlayer)   {SPXGCTemplateDefinition.playlayer   = "20"};
+  if (!SPXGCTemplateDefinition.webplayout)  {SPXGCTemplateDefinition.webplayout  = "-"};
+  if (!SPXGCTemplateDefinition.onair)       {SPXGCTemplateDefinition.onair       = "false"};
+  if (!SPXGCTemplateDefinition.out)         {SPXGCTemplateDefinition.out         = "manual"};
+  if (!SPXGCTemplateDefinition.dataformat)  {SPXGCTemplateDefinition.dataformat  = "xml"};
+  if (!SPXGCTemplateDefinition.uicolor)     {SPXGCTemplateDefinition.uicolor     = "0"};
+
+  // v.1.0.15 add imported timestamp
+  SPXGCTemplateDefinition.imported = String(Date.now()); // epoch. This COULD be used to compare template versions in profile/rundown.
+
+  // v.1.0.14 add note if no fields
+  if ( !SPXGCTemplateDefinition.DataFields ||  SPXGCTemplateDefinition.DataFields.length === 0) {
+    let emptyData = {}
+    emptyData.ftype = 'instruction'
+    emptyData.value = 'No editable fields'
+    SPXGCTemplateDefinition.DataFields = [emptyData];
+  }
+
+  let absPath = TemplatePath.split("\\").join("/");
+  let templateRootPath = path.join(spx.getStartUpFolder(), 'ASSETS', 'templates');
+  // let tmpRoot = config.general.templatefolder.split("\\").join("/");
+  let tmpRoot = templateRootPath.split("\\").join("/");
+  SPXGCTemplateDefinition.relpath = absPath.split(tmpRoot)[1];
+  // console.log('New SPXGCTemplateDefinition',SPXGCTemplateDefinition);
+
+  if (profileData.templates){
+    // add to existing templates
+    if (replaceIndex) {
+      // v.1.0.11 Replace existing template item
+      profileData.templates[replaceIndex] = SPXGCTemplateDefinition;
+    } else {
+      // add new one to the end
+      profileData.templates.push(SPXGCTemplateDefinition);
+    }
+  } else {
+    // create new templates array
+    profileData.templates=[SPXGCTemplateDefinition];
+  }
+
+  // Scan each template field for potential project variables ("prvar")
+  // and add them to the profile.
+  profileData.templates.forEach(function(template, index) {
+    template.DataFields.forEach(function(field, index) {
+      if (field.prvar) {
+        console.log('WIP - Found prvar in template field: ' + field.prvar);
+        if (!profileData.variables) {
+          profileData.variables = [];
+        }
+        // TODO: Bug here! This will overwrite existing variables with same name!
+
+        let foundOld = false;
+        profileData.variables.forEach(function(variable, index) {
+          if (variable.prvar === field.prvar) {
+            console.log('WIP - Found existing variable: ' + variable.prvar);
+            foundOld = true;
+            variable.ftype = field.ftype;
+            variable.title = field.title;
+            variable.value = field.value;
+            if (!variable.users.includes(template.relpath)) {
+              variable.users.push(template.relpath);
+            }
+          }
+        })
+
+        if (!foundOld) {
+          let varItem = {}
+          varItem.prvar = field.prvar;
+          varItem.ftype = field.ftype;
+          varItem.title = field.title;
+          varItem.value = field.value;
+          varItem.users = [template.relpath];
+          profileData.variables.push(varItem);
+        }
       }
-    });
-    return jsonData;
-  }
-  catch (error) {
-    logger.error('Failed to read folder ' + FOLDERstr + ': ' + error);
-    return ('Failed to read folder ' + FOLDERstr + '!');
-  }
-} // GetDataFiles ended
-*/
+    })
+  })
+  return profileData;
+  
+} // addTemplateToProfile ended
+
+
 
 async function orgGetDataFiles(FOLDERstr) {
   // return a list of all json files in the dataroot folder
@@ -1900,7 +1870,7 @@ async function orgGetDataFiles(FOLDERstr) {
     return jsonData;
   }
   catch (error) {
-    logger.error('Failed to read folder ' + FOLDERstr + ': ' + error);
+    logger.error('orgGetDataFiles / Failed to read folder ' + FOLDERstr + ': ' + error);
     return (error);
   }
 } // orgGetDataFiles ended
