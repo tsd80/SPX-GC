@@ -167,7 +167,7 @@ const apiHandler = require('../utils/api-handlers.js');
                 "vers"    :     "v1.3.0",
                 "method"  :     "POST",
                 "param"   :     "feedproxy",
-                "info"    :     "A POST version of the feedproxy endpoint. This endpoint is a helper for outgoing GET or POST requests requiring custom headers, such as <code>Authorization</code> or similar. Data is passed to the helper in the <code>body</code> of the POST request, in which <code>url</code> is the actual URL of the external endpoint. If the body contains a <code>postBody</code> -object, it will be passed to the outgoing API request. See principle in the example below, or search SPX Knowledge Base for more info with keyword <code>feedproxy</code>.",
+                "info"    :     "A POST version of the feedproxy endpoint. This endpoint is a helper for outgoing GET or POST requests requiring custom headers, such as <code>Authorization</code> or similar. Data is passed to the helper in the <code>body</code> of the POST request, in which <code>url</code> is the actual URL of the external endpoint. If the body contains a <code>postBody</code> -object, it will be passed to the outgoing API request as <code>body</code>. See principle in the example below, or search SPX Knowledge Base for more info with keyword <code>feedproxy</code>.",
                 "code"    :     {url: "https://api.endpoint.com/requiring/customheaders/", headers: {"key1": "my first value", "key2": "second value"}, postBody: {info: "If postBody is found, the outgoing request will be done using POST method, otherwise as GET."} }
               },
               {
@@ -498,8 +498,6 @@ const apiHandler = require('../utils/api-handlers.js');
       // Also, added a check if there is a body.body then it is 
       // considered a POST request to the external API.
 
-      let responseData = {};
-
       try {
         if (!req.body.url) {
           let errMsg = "url missing from feedproxy request. Make sure to have the correct JSON in your request.";
@@ -508,10 +506,10 @@ const apiHandler = require('../utils/api-handlers.js');
 
         if (req.body.postBody) {
           // console.log('Doing feedproxy request using POST method.');
-          responseData = executePOSTRequest(req, res);
+          executePOSTRequest(req, res);
         } else {
-          // console.log('Doing feedproxy request using GET method.');
-          responseData = executeGETRequest(req, res);
+          console.log('Doing feedproxy request using GET method.');
+          executeGETRequest(req, res);
         }
         
       } catch (error) {
@@ -526,28 +524,36 @@ const apiHandler = require('../utils/api-handlers.js');
 
     function executePOSTRequest(req, res) {
       // Added in 1.3.0
-      var data = new FormData();
-      data.append( "json", JSON.stringify( req.body.postBody ) );
+      // Fixed multiple bugs in 1.3.1
+      // * headers were not sent
+      // * data was sent incorrectly
       fetch(req.body.url, {
-          method: "POST",
-          body: data
+          method:   "POST",
+          headers:  req.body.headers,
+          body:     JSON.stringify(req.body.postBody)
       })
-      .then(function(res) { return res.json() })
+      .then(function(res) {
+        // console.log('RAW Response from external service', res);
+        return res.json()
+      })
       .then(function(data) {
+        // console.log('JSON Response from external service', data.status, data);
         res.status(200).send(data);
       })
       .catch(function(error) {
-        res.status(500).send(error);
+        console.log('Error from external service', error);
+        res.status(data.status).send(error);
       });
     } // end executePOSTRequest
 
     function executeGETRequest(req, res) {
-        // console.log('Using GET method', req.body);
+        console.log('Using GET method', req.body);
         axios.get(req.body.url, {
           headers: req.body.headers
         })
         .then(function (response) {
             res.header('Access-Control-Allow-Origin', '*')
+            console.log('Response from external service', response.status, response.data);
             res.send(response.data)
           })
           .catch(function (error) {
