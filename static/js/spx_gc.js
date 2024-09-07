@@ -113,6 +113,23 @@ socket.on('SPXMessage2Client', function (data) {
             }
             break;
 
+        case 'updateRundownItem':
+            // This is a message to update a single item in the rundown.
+            // Used by API to update the UI after a playback command.
+            let item = getElementByEpoch(data.itemID);
+            if (item) {
+                let itemTemplate = item.querySelector('[name="RundownItem[relpath]"]').value;
+                if (data.relpath == itemTemplate) {
+                    // console.log('Setting UI state of "' + data.itemID + '" forcefully to "' + data.command + '".');
+                    playItem(item, data.command, true) // true = prevent playout, because API did it already
+                } else {
+                    console.warn('Item template mismatch, not updating any indicators in the UI. Request', data);
+                }
+            } else {
+                console.warn('Requested item ' + data.itemID + ' not found. Not updating any indicators in the UI.');
+            }
+            break;
+
         default:
             // console.log('Unknown SPXMessage2Client command: ' + data.command);
     }
@@ -1335,8 +1352,7 @@ function getIndexOfRowItem(rowitem) {
     })
 } // getIndexOfRowItem ended
 
-function getElementIdByDomIndex(domIndex)
-{
+function getElementIdByDomIndex(domIndex) {
     // FIXME: Is this in use? From old logic?
     // A utility to iterate all DOM items and return ID of element at itemIndex.
     // request = dom index number
@@ -1347,8 +1363,42 @@ function getElementIdByDomIndex(domIndex)
     return JustElementID
 } // getElementIdByDomIndex ended
 
-function getDomIndexByElementId(ElementId)
-{
+async function appendSpxApiKey (data) {
+    // Added in v1.3.2
+    // Adds API key to data object or a URL
+    // from localstorage or a URL parameter
+
+    // Get apikey from URL
+    queryString = window.location.search;
+    urlParams   = new URLSearchParams(queryString);
+    addressKey  = urlParams.get('apikey') || null;
+
+    // Get apikey from local storage
+    let storageKey = localStorage.getItem('spxApiKey') || null;
+
+    if (!addressKey && !storageKey) {
+        // No API key found, return original data
+        return data;
+    }
+
+    let apikey = storageKey; // default to storage key
+    if (addressKey) {
+        apikey = addressKey; // use address key if present
+    }
+
+    if (typeof data === 'object') {
+        // POST - so add API key to data
+        data.apikey = apikey;
+        return data; // return object with API key
+    } else {
+        // GET - so add API key to URL
+        let char = data.includes('?') ? '&' : '?';
+        data += char + 'apikey=' + apikey; 
+        return data; // return URL with API key
+    }
+} // appendSpxApiKey
+
+function getDomIndexByElementId(ElementId) {
     // FIXME: Is this in use? From old logic?
     // A utility to iterate all DOM items and return dom index of given ElementId
     // Tested, this seem to work :)
@@ -1652,7 +1702,7 @@ function projectSettings() {
     document.location.href += '/config' ;
 } // projectSettings
 
-function playItem(itemrow='', forcedCommand='') {
+function playItem(itemrow='', forcedCommand='', preventPlayout=false) {
     // Play item toggle.
     //
     // request ..... itemrow
@@ -1663,6 +1713,9 @@ function playItem(itemrow='', forcedCommand='') {
     // and playout handler will parse required data and so on. 
     //
     // FIXME: Bug found 2023-11-07 Step counter in DOM needs to be reset on Play
+    //
+    // v1.3.2 - added "preventPlayout" flag. This is used in the new "updateRundownItem" feature
+    //          in directplayout API endpoint is present. 
 
     if (!itemrow) { itemrow = getFocusedRow();  }
     if (!itemrow) { return; }
@@ -1672,8 +1725,13 @@ function playItem(itemrow='', forcedCommand='') {
     data.epoch         = itemrow.getAttribute('data-spx-epoch') || 0;
     data.command       = setItemButtonStates(itemrow, forcedCommand);       // update buttons and return command (play/stop/playonce). ForcedCommand (stop) overrides.
     setMasterButtonStates(itemrow, 'from playItem');                        // update master button UI 
-    working('Sending ' + data.command + ' request.');
-    ajaxpost('/gc/playout',data);
+
+    if (preventPlayout) {
+        console.log('Prevent playout flag is set, skipping playout.');
+    } else {
+        working('Sending ' + data.command + ' request.');
+        ajaxpost('/gc/playout',data);
+    }
 
     // Stats
     if (data.command == 'play' || data.command=="playonce") { heartbeat(302) }
@@ -2355,8 +2413,6 @@ function showMessageSlider(msg, type='info', persist=false) {
     /*
         top?.showMessageSlider?.('Hello graphics operator!', 'happy');
     */
-
-
     let txt = msg;
     let typ = type; // happy, info, warn, error (classes happyMsg, infoMsg, warnMsg, errorMsg...)
     let domElement

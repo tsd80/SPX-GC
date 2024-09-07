@@ -137,11 +137,11 @@ const apiHandler = require('../utils/api-handlers.js');
             "endpoint"  :     "/api/v1/",
             "commands": [
               {
-                "vers"    :     "v1.0.12",
+                "vers"    :     "v1.0.12, v.1.3.2",
                 "method"  :     "POST",
                 "param"   :     "directplayout",
-                "info"    :     "Populate template and execute a play/continue/stop -command to it. Post request body example as JSON:",
-                "code"    :     {casparServer: "OVERLAY",  casparChannel: "1", casparLayer: "20", webplayoutLayer: "20", relativeTemplatePath: "/vendor/pack/template.html", out: "manual", DataFields: [{field: "f0", value: "Firstname"},{field: "f1", value: "Lastname"}], command: "play"}
+                "info"    :     "Populate template and execute a play/continue/stop -command to it. Please note the optional <code>updateRundownItem</code> property. <code>updateRundownItemitemID</code> is an optional object for forcing UI updates and persisting to defined rundown file. <b>Please note: special charaters in values does not work at the moment!</b> Post request body example as JSON:",
+                "code"    :     {casparServer: "OVERLAY",  casparChannel: "1", casparLayer: "20", webplayoutLayer: "20", relativeTemplatePath: "/vendor/pack/template.html", out: "manual", DataFields: [{field: "f0", value: "Firstname"},{field: "f1", value: "Lastname"}], command: "play", updateRundownItem: {updateUI: true, itemID: "myItemID", persist: true, "project": "myFirstProject", "rundown": "myFirstRundown"}}
             },
               {
                 "vers"    :     "v1.1.0",
@@ -270,10 +270,8 @@ const apiHandler = require('../utils/api-handlers.js');
       res.render('view-api-v1', { layout: false, functionList:functionsDoc });
   });
 
-
 // DIRECT COMMANDS (bypassing rundown) ----------------------------------------------------------
   router.get('/invokeTemplateFunction/', spxAuth.CheckAPIKey, async (req, res) => {
-
     try {
       // Init params
       let params = req.query.params || ''; // improved in 1.1.4 to avoid undefined
@@ -289,6 +287,7 @@ const apiHandler = require('../utils/api-handlers.js');
       dataOut.playlayer    = req.query.playlayer || '1';
       dataOut.webplayout   = req.query.webplayout || '1';
       dataOut.command      = 'invoke';
+      dataOut.apikey       = req.query.apikey || '';
       dataOut.function     = req.query.function || ''; // refactored in v.1.2.0 to use separate function and params
       dataOut.params       = encodeURIComponent(req.query.params) || '';
       if (params=='') {
@@ -297,8 +296,11 @@ const apiHandler = require('../utils/api-handlers.js');
         dataOut.invoke       = req.query.function + '(\"' + encodeURIComponent(params) + '\")'; // encode added in v1.1.0
       }
       logger.verbose('invokeTemplateFunction: [' + dataOut.function + '] with params: [' + dataOut.params + '].');
-      res.status(200).json(dataOut);
+      
+      // Order changed in v.1.3.2
       spx.httpPost(dataOut,'/gc/playout')
+      res.status(200).json(dataOut);
+      // 
     } catch (error) {
       res.status(error.status || 500).json({
           status: error.status || 500,
@@ -306,9 +308,6 @@ const apiHandler = require('../utils/api-handlers.js');
           info: "Search SPX Knowledge Base for more using keyword 'invokeTemplateFunction'."
       });
     }
-
-
-
   });
 
   router.get('/invokeExtensionFunction/', spxAuth.CheckAPIKey, async (req, res) => {
@@ -318,6 +317,7 @@ const apiHandler = require('../utils/api-handlers.js');
     dataOut.spxcmd    = 'invokeExtensionFunction';
     dataOut.function  = req.query.function || '';
     dataOut.params    = req.query.params || '';
+    dataOut.apikey    = req.query.apikey || '';
     io.emit('SPXMessage2Extension', dataOut);
     logger.verbose('invokeExtensionFunction: [' + dataOut.function + '] with params: [' + dataOut.params + '].');
     res.status(200).json(dataOut);
@@ -326,6 +326,9 @@ const apiHandler = require('../utils/api-handlers.js');
   router.post('/directplayout', spxAuth.CheckAPIKey, async (req, res) => {
     // Improved in 1.3.0 to check valid JSON data and that template exists.
     // Also supports timed out modes.
+
+    // console.log('POST directplayout:', req.body);
+
     try {
       let templateFile = req.body.relativeTemplatePath || '/vendor/pack/template.html';
       let templateComd = req.body.command || 'play';
@@ -350,14 +353,24 @@ const apiHandler = require('../utils/api-handlers.js');
       dataOut.playlayer    = req.body.casparLayer || '1';
       dataOut.webplayout   = req.body.webplayoutLayer || '1';
       dataOut.out          = req.body.out || 'manual';
-      dataOut.prepopulated = 'true';
       dataOut.relpath      = templateFile;
       dataOut.command      = req.body.command || 'play';
       dataOut.dataformat   = req.body.dataformat || 'json'; // changed to json in 1.3.0
       dataOut.fields       = req.body.DataFields || '{field: f0, value: "Default field data. Something wrong with your API call?"}';
+      dataOut.prepopulated = 'true';
       dataOut.referrer     = 'directplayout';
-      res.status(200).json(dataOut);
+      dataOut.apikey       = req.body.apikey || '';
+
+       // added in 1.3.2
+      if (req.body?.updateRundownItem?.itemID) {
+        dataOut.updateRundownItem = req.body.updateRundownItem;
+      }
+
+      // Order changed in v.1.3.2
+      // console.log('executing playout:', dataOut);
       spx.httpPost(dataOut,'/gc/playout')
+      res.status(200).json(dataOut);
+      // 
     } catch (error) {
       res.status(error.status || 500).json({
           status: error.status || 500,
@@ -366,7 +379,7 @@ const apiHandler = require('../utils/api-handlers.js');
       });
     }
     // TODO: Check if this supports MANUAL & 4000 ms play modes
-  });
+  }); // end directplayout
 
   router.get('/directplayout', spxAuth.CheckAPIKey, async (req, res) => {
     res.status(404).send('Sorry, this endpoint only available as POST REQUEST with parameters, see the example text or see controlRundownItemByID -endpoint for basic play/stop controls.');
@@ -394,6 +407,7 @@ const apiHandler = require('../utils/api-handlers.js');
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownLoad';
       dataOut.file    = file;
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end load
@@ -402,6 +416,7 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownFocusFirst';
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end focusFirst
@@ -410,6 +425,7 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownFocusNext';
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end focusNext
@@ -418,6 +434,7 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownFocusPrevious';
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end focusPrevious
@@ -426,6 +443,7 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownFocusLast';
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end focusLast
@@ -434,6 +452,7 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2;
       dataOut.APIcmd  = 'RundownFocusByID';
+      dataOut.apikey  = req.query.apikey || '';
       dataOut.itemID  = req.params.id;
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).send('Sent request to controller: ' + JSON.stringify(dataOut));
@@ -443,13 +462,14 @@ const apiHandler = require('../utils/api-handlers.js');
       let dataOut = {};
       dataOut.info    = ack2
       dataOut.APIcmd  = 'RundownStopAll';
+      dataOut.apikey  = req.query.apikey || '';
       io.emit('SPXMessage2Controller', dataOut);
       res.status(200).json(dataOut);
     }); // end stopAllLayers
 
 // HELPER COMMANDS ----------------------------------------------------------------------------------
 
-    router.get('/version', spxAuth.CheckAPIKey, async (req, res) => {
+    router.get('/version', async (req, res) => {
       let data = {};
       data.vendor = "SPX Graphics";
       data.product = "SPX Server";
@@ -514,10 +534,13 @@ const apiHandler = require('../utils/api-handlers.js');
       }); 
     }); // end feedproxy
 
+    
     router.post('/feedproxy', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.3.0 for using headers in the outgoing GET request
       // Also, added a check if there is a body.body then it is 
       // considered a POST request to the external API.
+
+
 
       try {
         if (!req.body.url) {
@@ -526,13 +549,12 @@ const apiHandler = require('../utils/api-handlers.js');
         }
 
         if (req.body.postBody) {
-          // console.log('Doing feedproxy request using POST method.');
-          executePOSTRequest(req, res);
+          // console.log('Doing feedproxy request using POST method, payload', req.body.postBody);
+          executePOSTRequest(req, res); // res handled in the function
         } else {
-          console.log('Doing feedproxy request using GET method.');
-          executeGETRequest(req, res);
+          // console.log('Doing feedproxy request using GET method.');
+          executeGETRequest(req, res);  // res handled in the function
         }
-        
       } catch (error) {
         res.status(error.status || 500).json({
           status: error.status || 500,
@@ -543,49 +565,61 @@ const apiHandler = require('../utils/api-handlers.js');
     }); // end feedproxy post handler
 
 
-    function executePOSTRequest(req, res) {
+    async function executePOSTRequest(req, res) {
       // Added in 1.3.0
       // Fixed multiple bugs in 1.3.1
       // * headers were not sent
       // * data was sent incorrectly
+      // Improved in 1.3.2
+
+      // console.log('Using POST method', req.body);
+
       fetch(req.body.url, {
-          method:   "POST",
-          headers:  req.body.headers,
-          body:     JSON.stringify(req.body.postBody)
+        method: 'POST',
+        body: JSON.stringify(req.body.postBody),
+        headers: req.body.headers
       })
-      .then(function(res) {
-        // console.log('RAW Response from external service', res);
-        return res.json()
+      .then(function(response) {
+        // console.log('Response:', response);
+        res.status(response.status).send(response.json())
       })
-      .then(function(data) {
-        // console.log('JSON Response from external service', data.status, data);
-        res.status(200).send(data);
-      })
-      .catch(function(error) {
-        console.log('Error from external service', error);
-        res.status(data.status).send(error);
-      });
+      .catch(error => {
+        console.error('Error:', error)
+      }); 
     } // end executePOSTRequest
 
     function executeGETRequest(req, res) {
-        console.log('Using GET method', req.body);
-        axios.get(req.body.url, {
+      // This handles response to the client
+      // console.log('Using GET method', req.body);
+      axios.
+        get(req.body.url, {
           headers: req.body.headers
         })
-        .then(function (response) {
-            res.header('Access-Control-Allow-Origin', '*')
-            console.log('Response from external service', response.status, response.data);
-            res.send(response.data)
-          })
-          .catch(function (error) {
-            res.status(error.status || 500).json({
-                status: error.status || 500,
-                error: error.message,
-                info: "Search SPX Knowledge Base for more using keyword 'feedproxy'."
-            });
+
+        .then((response) => {
+          res.header('Access-Control-Allow-Origin', '*')
+          // console.log('Response status:', response.statusText, response.status, response.data);
+          logger.verbose('executeGETRequest response: ' + response.status);
+          res.status(response.status||200).send(response.data);
+        })
+
+        .catch((error) => {
+          if (error.response) {
+            // console.log('data......', error.response.data);
+            // console.log('status....', error.response.status);
+            // console.log('headers...', error.response.headers);
+            res.status(error.response.status||500).send(error.response.data);
+          } else if (error.request) {
+            // The request was made but no response was received
+            // console.log('request...', error.request);
+            res.status(500).send(error.request);
+          } else {
+            // Something happened in setting up the request
+            // console.log('Error msg...', error.message);
+            res.status(500).send(error.message);
           }
-        ); 
-    } // end executeGETRequest
+        });
+  } // end executeGETRequest
 
     router.get('/getprojects', spxAuth.CheckAPIKey, async (req, res) => {
       // Added in 1.1.1
@@ -878,6 +912,7 @@ const apiHandler = require('../utils/api-handlers.js');
         dataOut.datafile      = RundownFile;
         dataOut.epoch         = req.query.item;
         dataOut.command       = templateComd;
+        dataOut.apikey        = req.query.apikey || '';
         dataOut.prepopulated  = 'false';
         dataOut.forceFileReadOnce = true; // See 1.3.0. Release Notes
         res.status(200).json(dataOut);
@@ -905,7 +940,7 @@ const apiHandler = require('../utils/api-handlers.js');
         }
 
         let datafile = path.normalize(file);
-        const RundownData = await spx.GetJsonData(datafile);
+        let RundownData = await spx.GetJsonData(datafile);
 
         // First check for conflicts
         RundownData.templates.forEach((item,index) => {
@@ -921,6 +956,8 @@ const apiHandler = require('../utils/api-handlers.js');
         });
 
         RundownData.updated = new Date().toISOString();
+
+        RundownData = await spx.appendProjectFile(RundownData, datafile, "from changeItemID");
         global.rundownData = RundownData;
         await spx.writeFile(datafile,RundownData);
         logger.verbose('Changed item ID to ' + newI);
@@ -964,6 +1001,7 @@ const apiHandler = require('../utils/api-handlers.js');
         });
 
         RundownData.updated = new Date().toISOString();
+        RundownData = await spx.appendProjectFile(RundownData, datafile, "from changeItemData");
         global.rundownData = RundownData; // push to memory also for next take
         await spx.writeFile(datafile,RundownData);
         logger.verbose('ChangeItemData: file: [' + file + '], ID: [' + epoc + '], key: [' + prop + '], value: [' + valu + ']')
