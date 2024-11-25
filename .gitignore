@@ -59,6 +59,7 @@ kubernetes/
 node_modules/
 .VSCodeCounter/
 .Spotlight-V100
+static/templateviewer/
 CONTENT_REPOSITORIES*/**
 
 
@@ -69,12 +70,12 @@ DATAROOT/
 
 
 # IGNORE SPX ASSETS
-# ...allow specific files and folders for GitHub
-ASSETS/
-
+# ...but allow specific files and folders for GitHub
+ASSETS/**
 !ASSETS/csv/csv-folder.md
 !ASSETS/excel/ticker-demo/basic-news-ticker.xlsx
-!ASSETS/templates/softpix/Template_Pack_1.3
+# Add templates with:
+# git add ASSETS/templates/softpix/Template_Pack_1.3.2/** -f
 
 # ...allow some PLUGIN files for GitHub
 !ASSETS/plugins/lib

@@ -35,6 +35,10 @@ const fs = require('fs')
 const morgan = require('morgan')
 const path = require('path')
 const rfs = require('rotating-file-stream')
+
+//const open = require('open');
+const open = import('open');
+
 var macaddress = require('macaddress');
 
 console.log('\n  SPX Graphics Controller server is starting.\n  Closing this window/process will stop the server.\n');
@@ -77,14 +81,14 @@ app.use(express.static(path.join(__dirname,('static'))))                    // t
 app.use(express.static(path.resolve(spx.getStartUpFolder(),'ASSETS')))      // http root in startup folder / ASSETS
 
 const ipad = ip.address();
-const open = require('open');
+
 var pjson = require('./package.json');
 var packageversion = pjson.version;
 const vers = process.env.npm_package_version || packageversion || 'X.X.X';
 
 // global.isDev = process.env.SPX_ROOT_FOLDER ? true : false; // value used internally for SPX & Template dev
 global.vers = vers;
-global.excel = {'readtime':0000, 'filename':'', 'data':''}; // used as Excel cache
+global.excel = {'readtime':0, 'filename':'', 'data':''}; // used as Excel cache
 
 // Added in 1.1.1.
 global.env = {'vendor':'', 'product':'', 'version':''};
@@ -124,8 +128,8 @@ var accessLogStream = rfs.createStream('access.log', {
 app.use(morgan('combined', { stream: accessLogStream }))
 
 
-// Handlebars templating
-app.engine('handlebars', exphbs({
+// Handlebars templating, updated in 1.3.3
+app.engine('handlebars', exphbs.engine({
   extname: '.handlebars',
   //defaultLayout: 'filelist',
   helpers: {
@@ -896,17 +900,14 @@ process.on('uncaughtException', function(err) {
 var server = app.listen(port, (err) => {
 
   let splash = '  Copyright 2020- SPX Graphics\n\n' +
-  `  SPX version ............ ${global.vers}\n` +  
-  '  License ................ See LICENSE.txt\n' +
-  '  Homepage ............... https://spx.graphics\n' +
-  '  Template Store ......... https://spx.graphics/store\n' +
-  '  Knowledge Base ......... https://spxgc.tawk.help\n' +
-  `  Config file ............ ${configfileref}\n`  +
-  `  Cfg / locale ........... ${config.general.langfile}\n`  +
-  `  Cfg / host-id (name) ... ${global.pmac} (${config.general.hostname})\n`  +
-  `  Cfg / loglevel ......... ${config.general.loglevel} (options: error | warn | info | verbose | debug )\n` + 
-  `  Cfg / dataroot ......... ${path.resolve(config.general.dataroot)}\n`  +  
-  `  Cfg / logfolder ........ ${logDirectory}\n`; 
+  `  SPX Server version ........ ${global.vers}\n` +  
+  '  License ................... See LICENSE.txt\n' +
+  `  Config file ............... ${configfileref}\n`  +
+  `  Cfg / locale .............. ${config.general.langfile}\n`  +
+  `  Cfg / host-id (name) ...... ${global.pmac} (${config.general.hostname})\n`  +
+  `  Cfg / loglevel ............ ${config.general.loglevel} (options: error | warn | info | verbose | debug )\n` + 
+  `  Cfg / dataroot ............ ${path.resolve(config.general.dataroot)}\n`  +  
+  `  Cfg / logfolder ........... ${logDirectory}\n`; 
   /* `  Cfg / lauchchrome ...... ${config.general.launchchrome}\n` */
 
   if (config.general.apikey && config.general.apikey != '') {
@@ -931,8 +932,14 @@ var server = app.listen(port, (err) => {
   // `  Cfg / templatesource ... ${TemplatesFromInfo}\n\n`  +  
   // `  See README.pdf and Knowledge Base for more info\n` + 
   // `  and please visit spx.graphics/store to support us.\n\n` +  
-  `\n  Visit spx.graphics/contact for SPX Creative Services.`; 
-  
+  `\n  Explore SPX Graphics related resources:` +  
+  `\n  + Homepage ................ https://spx.graphics` +  
+  `\n  + Knowledge Base .......... https://spxgc.tawk.help` +  
+  `\n  + SPX in the Cloud ........ https://spxcloud.app` + 
+  `\n  + Creative Services ....... https://spx.graphics/contact` +  
+  `\n  + SPX Graphics for Zoom ... https://spxzoom.com` +
+  `\n  + Buy and sell templates .. https://html.graphics/marketplace`;
+
   console.log(splash);
 
   let prompt = 'Open SPX in a browser:';

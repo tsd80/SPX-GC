@@ -49,7 +49,9 @@ socket.on('SPXMessage2Client', function (data) {
     // Handles messages coming from server to this client.
     // All comms using 'SPXMessage2Client' as a conduit with data object and
     // data.spxcmd as function identifier. Additional object values are payload.
+
     // console.log('SPXMessage2Client received', data)
+    
     switch (data.spxcmd) {
         case 'notifyMultipleControllers':
             let notification = document.getElementById('severalDetected');
@@ -1634,27 +1636,34 @@ function nextItem(itemrow='') {
         // itemrow not given, get focused row
         itemrow = getFocusedRow();
     }
+
     data = {};
     data.datafile      = document.getElementById('datafile').value;
     data.epoch         = itemrow.getAttribute('data-spx-epoch');
-    data.command       = 'next';
-    working('Sending ' + data.command + ' request.');
-    ajaxpost('/gc/playout',data);
-    heartbeat(304); // identifier
 
     // decrease steps left
     var stepsleft= parseInt(itemrow.getAttribute('data-spx-stepsleft'))-1;
     itemrow.setAttribute('data-spx-stepsleft',stepsleft);
-    // console.log('Steps left: ' + stepsleft);
     if (stepsleft < 1) {
+        // console.log('No more steps (' + stepsleft + ') left, stopping item.');
         // This should go somewhere else - because of DRY.
         // This duplicates some code from playItem
-        // itemrow.setAttribute('data-spx-onair', false);
+        itemrow.setAttribute('data-spx-onair', false);
         itemrow.setAttribute('data-spx-stepsleft',itemrow.querySelector('input[name="RundownItem[steps]"]').value); // reset counter
         let uselessReturnValue = setItemButtonStates(itemrow, forcedCommand='stop');
         document.getElementById('MasterCONTINUE').classList.add('disabled');
+        data.command = 'stop';
         setMasterButtonStates(itemrow);
+    } else {
+        // console.log('Steps left: ' + stepsleft + ', continuing item...');
+        data.command = 'next';
     }
+
+    working('Sending ' + data.command + ' request.');
+    ajaxpost('/gc/playout',data);
+
+    //### DEBUG
+    return;
 
     // Check for function_onNext event (added in 1.1.4):
     let onNextField = itemrow.querySelector('[name="RundownItem[function_onNext]"]');
@@ -1945,6 +1954,9 @@ function setItemButtonStates(itemrow, forcedCommand=''){
     if (itemrow.getAttribute('data-spx-onair')=="true" || forcedCommand=='stop') {
         // so, we are playing and needs to stop
         CommandToExecute = 'stop';
+
+        // Reset current step counter. Added in 1.3.3
+        itemrow.setAttribute('data-spx-stepsleft',itemrow.querySelector('input[name="RundownItem[steps]"]').value);
     }
 
     if (itemrow.getAttribute('data-spx-onair')=="true" && forcedCommand=='play') {
@@ -2328,9 +2340,8 @@ function setMasterButtonStates(itemrow, debugMessage='') {
     }
 
     // console.clear();
-    // console.log('States check', typeof itemrow, itemrow);
-    // console.log('CHECKING: setMasterButtonStates ' + itemrow.getAttribute('data-spx-epoch') + ' ' + debugMessage);
-
+    // console.log('States check: "' + typeof itemrow + '"', itemrow);
+    // console.log('CHECKING: setMasterButtonStates of item ' + itemrow.getAttribute('data-spx-epoch') + ' (' + debugMessage + ')');
 
     // this gfx only has in-animation
     if ( itemrow.querySelector('input[name="RundownItem[out]"]') && itemrow.querySelector('input[name="RundownItem[steps]"]').value=="none" ) {
@@ -2351,42 +2362,26 @@ function setMasterButtonStates(itemrow, debugMessage='') {
     
     // console.log('Onair', onair, 'Changed', chngd, 'Steps', steps );
 
-
-    // UPDATE
-    // Lines disabled in Pro 1.2.2 ==> 
-    // UPDATEBUTTON.classList.add('disabled');            
-    // if (chngd && onair)
-    //     {
-    //         setTimeout(function () {
-    //             UPDATEBUTTON.classList.remove('disabled');
-    //             itemrow.querySelector('[data-spx-name="updatebutton"]').classList.remove('disabled');
-    //         }, 2);
-    //     }
-
     // CONTINUE
-    CONTINBUTTON.classList.add('disabled');
-    if (steps > 1 && onair )
-        {
-            setTimeout(function () { CONTINBUTTON.classList.remove('disabled'); }, 3);
-        }
+    CONTINBUTTON.classList.add('disabled'); 
+    if (stepsleft > 1 && onair ) {
+        setTimeout(function () { CONTINBUTTON.classList.remove('disabled'); }, 3);
+    }
 
     // PLAY - STOP TOGGLE
-    if (onair)
-        {
-            // console.log('Focused item IS playing (so change it to STOP)');
-            TOGGLEBUTTON.classList.remove('disabled')
-            TOGGLEBUTTON.innerText = TOGGLEBUTTON.getAttribute('data-spx-stoptext');
-            TOGGLEBUTTON.classList.remove('bg_green');
-            TOGGLEBUTTON.classList.add('bg_red');
-        }
-    else
-        {
-            // console.log('Focused item NOT playing (so change it to PLAY)');
-            TOGGLEBUTTON.classList.remove('disabled')
-            TOGGLEBUTTON.innerText = TOGGLEBUTTON.getAttribute('data-spx-playtext');
-            TOGGLEBUTTON.classList.remove('bg_red');
-            TOGGLEBUTTON.classList.add('bg_green');
-        }
+    if (onair) {
+        // console.log('Focused item IS playing (so change it to STOP)');
+        TOGGLEBUTTON.classList.remove('disabled')
+        TOGGLEBUTTON.innerText = TOGGLEBUTTON.getAttribute('data-spx-stoptext');
+        TOGGLEBUTTON.classList.remove('bg_green');
+        TOGGLEBUTTON.classList.add('bg_red');
+    } else {
+        // console.log('Focused item NOT playing (so change it to PLAY)');
+        TOGGLEBUTTON.classList.remove('disabled')
+        TOGGLEBUTTON.innerText = TOGGLEBUTTON.getAttribute('data-spx-playtext');
+        TOGGLEBUTTON.classList.remove('bg_red');
+        TOGGLEBUTTON.classList.add('bg_green');
+    }
 } // setTGButtonStates ended 
 
 function hideMessageSlider() {
@@ -2488,7 +2483,7 @@ function spx_system(cmd,servername='') {
             break;
 
         case 'CHECKCONNECTIONS':
-            console.log('Checking connections to servers...', servername);
+            // console.log('Checking connections to servers...', servername);
             data.command = 'CHECKCONNECTIONS';
             data.server = servername;
             break;
