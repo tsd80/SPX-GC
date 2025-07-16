@@ -9,3 +9,17 @@ README.md
 README.pdf
 RELEASE_NOTES.md
 START_SPX.bat
+Dockerfile
+docker-compose.yml
+*.log
+*.md
+*.txt
+*.env
+*.sh
+*.bak
+*.swp
+*.swo
+*.DS_Store
+.vscode
+.idea
+coverage
